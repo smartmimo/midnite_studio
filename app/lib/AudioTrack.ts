@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
-import { Jungle } from "./Jungle";
+import { SoundTouchNode } from "@soundtouchjs/audio-worklet";
 
 export class AudioTrack {
   id: string;
@@ -36,8 +36,16 @@ export class AudioTrack {
       this.stream.getTracks().forEach((t) => t.stop());
     }
 
+    const audioConstraints = {
+      echoCancellation: false,
+      autoGainControl: false,
+      noiseSuppression: false,
+      sampleRate: 48000,
+      channelCount: 2
+    };
+
     const constraints: MediaStreamConstraints = {
-      audio: deviceId ? { deviceId: { exact: deviceId } } : true,
+      audio: deviceId ? { deviceId: { exact: deviceId }, ...audioConstraints } : audioConstraints,
       video: false,
     };
 
@@ -54,7 +62,12 @@ export class AudioTrack {
     if (!this.stream) throw new Error("No audio stream");
     this.chunks = [];
     this.startTime = Date.now();
-    this.recorder = new MediaRecorder(this.stream);
+    try {
+      // Force high quality audio bitrate (256 kbps)
+      this.recorder = new MediaRecorder(this.stream, { audioBitsPerSecond: 256000 });
+    } catch (e) {
+      this.recorder = new MediaRecorder(this.stream);
+    }
     this.recorder.ondataavailable = (e) => {
       if (e.data.size > 0) this.chunks.push(e.data);
     };
@@ -117,12 +130,27 @@ export class AudioTrack {
     storeNodes?: (nodes: any) => void 
   ): AudioNode {
     // 0. Pitch Shift
-    const jungle = new Jungle(ctx);
+    const pitchShifter = new SoundTouchNode(ctx);
     const totalPitch = this.basePitch + this.pitch;
-    const pitchRatio = Math.pow(2, totalPitch / 12);
-    jungle.setPitchOffset(pitchRatio - 1);
     
-    sourceNode.connect(jungle.input);
+    // Add bypass gains to avoid phase destruction when pitch = 0
+    const pitchBypassGain = ctx.createGain();
+    const pitchEffectGain = ctx.createGain();
+
+    if (totalPitch === 0) {
+      pitchBypassGain.gain.value = 1;
+      pitchEffectGain.gain.value = 0;
+    } else {
+      pitchBypassGain.gain.value = 0;
+      pitchEffectGain.gain.value = 1;
+      const pitchRatio = Math.pow(2, totalPitch / 12);
+      pitchShifter.pitch.value = pitchRatio;
+      pitchShifter.tempo.value = 1.0;
+    }
+    
+    sourceNode.connect(pitchBypassGain);
+    sourceNode.connect(pitchShifter);
+    pitchShifter.connect(pitchEffectGain);
 
     // 1. EQ
     const bassNode = ctx.createBiquadFilter();
@@ -138,7 +166,8 @@ export class AudioTrack {
     // 2. Bus
     const eqBus = ctx.createGain();
     
-    jungle.output.connect(bassNode);
+    pitchBypassGain.connect(bassNode);
+    pitchEffectGain.connect(bassNode);
     bassNode.connect(trebleNode);
     trebleNode.connect(eqBus);
 
@@ -182,7 +211,9 @@ export class AudioTrack {
 
     if (storeNodes) {
       storeNodes({
-        jungle,
+        pitchShifter,
+        pitchBypassGain,
+        pitchEffectGain,
         bassNode,
         trebleNode,
         delayNode,

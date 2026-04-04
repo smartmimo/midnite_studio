@@ -1,5 +1,5 @@
 import { AudioTrack } from "./AudioTrack";
-import { Jungle } from "./Jungle";
+import { SoundTouchNode } from "@soundtouchjs/audio-worklet";
 
 // Generate a simple synthetic impulse response for the Reverb effect
 function createSyntheticImpulseResponse(ctx: BaseAudioContext): AudioBuffer {
@@ -75,10 +75,11 @@ export class AudioManager {
 
   constructor() {}
 
-  initCtx() {
+  async initCtx() {
     if (!this.ctx) {
       this.ctx = new AudioContext();
       this.impulseBuffer = createSyntheticImpulseResponse(this.ctx);
+      await SoundTouchNode.register(this.ctx, '/soundtouch-processor.js');
     }
   }
 
@@ -93,7 +94,7 @@ export class AudioManager {
   }
 
   async duplicateWithBakedPitch(id: string, newPitch: number): Promise<AudioTrack | null> {
-    this.initCtx();
+    await this.initCtx();
     const original = this.tracks.find(t => t.id === id);
     if (!original || !original.audioBlob) return null;
 
@@ -101,16 +102,18 @@ export class AudioManager {
     const buffer = await this.ctx!.decodeAudioData(arrayBuffer);
 
     const offlineCtx = new OfflineAudioContext(buffer.numberOfChannels, buffer.length, buffer.sampleRate);
+    await SoundTouchNode.register(offlineCtx, '/soundtouch-processor.js');
     
     const sourceNode = offlineCtx.createBufferSource();
     sourceNode.buffer = buffer;
 
-    const jungle = new Jungle(offlineCtx);
+    const pitchShifter = new SoundTouchNode(offlineCtx);
     const pitchRatio = Math.pow(2, newPitch / 12);
-    jungle.setPitchOffset(pitchRatio - 1);
+    pitchShifter.pitch.value = pitchRatio;
+    pitchShifter.tempo.value = 1.0;
 
-    sourceNode.connect(jungle.input);
-    jungle.output.connect(offlineCtx.destination);
+    sourceNode.connect(pitchShifter);
+    pitchShifter.connect(offlineCtx.destination);
     sourceNode.start(0);
 
     const renderedBuffer = await offlineCtx.startRendering();
@@ -133,7 +136,7 @@ export class AudioManager {
   }
 
   async playPreview(offset: number = 0) {
-    this.initCtx();
+    await this.initCtx();
     this.stopPreview(); // clear previous
 
     if (!this.ctx) return;
@@ -174,10 +177,18 @@ export class AudioManager {
   updateLiveNodes(track: AudioTrack) {
     const nodes = this.liveNodesMap.get(track.id);
     if (nodes) {
-      if (nodes.jungle) {
+      if (nodes.pitchShifter && nodes.pitchBypassGain && nodes.pitchEffectGain) {
         const totalPitch = track.basePitch + track.pitch;
-        const pitchRatio = Math.pow(2, totalPitch / 12);
-        nodes.jungle.setPitchOffset(pitchRatio - 1);
+        if (totalPitch === 0) {
+           nodes.pitchBypassGain.gain.value = 1;
+           nodes.pitchEffectGain.gain.value = 0;
+        } else {
+           nodes.pitchBypassGain.gain.value = 0;
+           nodes.pitchEffectGain.gain.value = 1;
+           const pitchRatio = Math.pow(2, totalPitch / 12);
+           nodes.pitchShifter.pitch.value = pitchRatio;
+           nodes.pitchShifter.tempo.value = 1.0;
+        }
       }
       nodes.bassNode.gain.value = track.bass;
       nodes.trebleNode.gain.value = track.treble;
@@ -190,7 +201,7 @@ export class AudioManager {
   }
 
   async exportMixedAudio(): Promise<Blob> {
-    this.initCtx();
+    await this.initCtx();
     if (this.tracks.length === 0) throw new Error("No tracks to export");
 
     // Decoded buffers
@@ -211,6 +222,7 @@ export class AudioManager {
     // Render with OfflineAudioContext
     const sampleRate = this.ctx!.sampleRate;
     const offlineCtx = new OfflineAudioContext(2, maxLength, sampleRate);
+    await SoundTouchNode.register(offlineCtx, '/soundtouch-processor.js');
     const offlineImpulse = createSyntheticImpulseResponse(offlineCtx);
 
     for (const item of buffers) {
