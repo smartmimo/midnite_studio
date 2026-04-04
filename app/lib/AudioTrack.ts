@@ -1,5 +1,4 @@
 import { v4 as uuidv4 } from "uuid";
-import { SoundTouchNode } from "@soundtouchjs/audio-worklet";
 
 export class AudioTrack {
   id: string;
@@ -130,7 +129,11 @@ export class AudioTrack {
     storeNodes?: (nodes: any) => void 
   ): AudioNode {
     // 0. Pitch Shift
-    const pitchShifter = new SoundTouchNode(ctx);
+    const SoundTouchNodeClass = (window as any).SoundTouchNodeClass;
+    if (!SoundTouchNodeClass) {
+      throw new Error("SoundTouchNodeClass not injected");
+    }
+    const pitchShifter = new SoundTouchNodeClass(ctx);
     const totalPitch = this.basePitch + this.pitch;
     
     // Add bypass gains to avoid phase destruction when pitch = 0

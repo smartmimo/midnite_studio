@@ -1,5 +1,4 @@
 import { AudioTrack } from "./AudioTrack";
-import { SoundTouchNode } from "@soundtouchjs/audio-worklet";
 
 // Generate a simple synthetic impulse response for the Reverb effect
 function createSyntheticImpulseResponse(ctx: BaseAudioContext): AudioBuffer {
@@ -77,9 +76,11 @@ export class AudioManager {
 
   async initCtx() {
     if (!this.ctx) {
-      this.ctx = new AudioContext();
+      this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
       this.impulseBuffer = createSyntheticImpulseResponse(this.ctx);
-      await SoundTouchNode.register(this.ctx, '/soundtouch-processor.js');
+      const mod = await import("@soundtouchjs/audio-worklet");
+      (window as any).SoundTouchNodeClass = mod.SoundTouchNode;
+      await mod.SoundTouchNode.register(this.ctx, '/soundtouch-processor.js');
     }
   }
 
@@ -198,7 +199,8 @@ export class AudioManager {
     // Render with OfflineAudioContext
     const sampleRate = this.ctx!.sampleRate;
     const offlineCtx = new OfflineAudioContext(2, maxLength, sampleRate);
-    await SoundTouchNode.register(offlineCtx, '/soundtouch-processor.js');
+    const mod = await import("@soundtouchjs/audio-worklet");
+    await mod.SoundTouchNode.register(offlineCtx, '/soundtouch-processor.js');
     const offlineImpulse = createSyntheticImpulseResponse(offlineCtx);
 
     for (const item of buffers) {
