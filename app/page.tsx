@@ -34,6 +34,7 @@ export default function StudioPage() {
   const [videoDuration, setVideoDuration] = useState(0);
 
   const [isPlaying, setIsPlaying] = useState(false);
+  const [overdubbingTrackId, setOverdubbingTrackId] = useState<string | null>(null);
 
   const handleVideoDeviceSelect = async (deviceId: string) => {
     try {
@@ -71,6 +72,47 @@ export default function StudioPage() {
     setTracks([...audioManager.tracks]);
   };
 
+  const handleRecordTrack = (id: string) => {
+    if (videoRef.current && videoSrc) {
+      videoRef.current.currentTime = 0;
+      videoRef.current.play();
+    }
+    audioManager.playPreview(0);
+    setIsPlaying(true);
+
+    const track = audioManager.tracks.find(t => t.id === id);
+    if (track) track.startRecording();
+    
+    setOverdubbingTrackId(id);
+  };
+
+  const handleStopRecordTrack = async (id: string) => {
+    if (videoRef.current) videoRef.current.pause();
+    audioManager.stopPreview();
+    setIsPlaying(false);
+
+    const track = audioManager.tracks.find(t => t.id === id);
+    if (track) {
+      await track.stopRecording();
+    }
+
+    setOverdubbingTrackId(null);
+    setTracks([...audioManager.tracks]);
+  };
+
+  const handleDuplicateTrack = (id: string, newPitch: number) => {
+    const original = audioManager.tracks.find(t => t.id === id);
+    if (!original) return;
+    
+    const duplicate = original.clone();
+    const baseName = original.name.replace(/^\[[+-]?\d+\]\s*/, '');
+    const pitchPrefix = newPitch === 0 ? '' : `[${newPitch > 0 ? '+' + newPitch : newPitch}] `;
+    duplicate.name = `${pitchPrefix}${baseName}`;
+    
+    audioManager.addTrack(duplicate);
+    setTracks([...audioManager.tracks]);
+  };
+
   const handleRecord = () => {
     if (audioManager.tracks.length === 0 && !videoManager.stream) {
       return alert("Please select at least one camera or microphone!");
@@ -88,20 +130,31 @@ export default function StudioPage() {
     setRecordingState("recording");
   };
 
+
+
   const handleStop = async () => {
     setRecordingState("idle");
+
+    if (overdubbingTrackId) {
+      if (videoRef.current) videoRef.current.pause();
+      audioManager.stopPreview();
+      setIsPlaying(false);
+    }
+
     const videoPromise = videoManager.stream ? videoManager.stopRecording() : Promise.resolve(null);
     const audioPromise = audioManager.stopRecordingAll();
     await Promise.all([videoPromise, audioPromise]);
 
     const finalVideoBlob = videoManager.finalBlob;
-    if (finalVideoBlob && finalVideoBlob.size > 0) {
+    if (finalVideoBlob && finalVideoBlob.size > 0 && !overdubbingTrackId) {
       if (videoRef.current) videoRef.current.srcObject = null;
       setVideoSrc(URL.createObjectURL(finalVideoBlob));
       if (videoManager.duration) {
         setVideoDuration(videoManager.duration);
       }
     }
+    
+    setOverdubbingTrackId(null);
     setRecordingState("recorded");
   };
 
@@ -207,7 +260,12 @@ export default function StudioPage() {
               controls={false}
               onPlay={() => setIsPlaying(true)}
               onPause={() => setIsPlaying(false)}
-              onEnded={() => setIsPlaying(false)}
+              onEnded={() => {
+                setIsPlaying(false);
+                if (overdubbingTrackId) {
+                  handleStopRecordTrack(overdubbingTrackId);
+                }
+              }}
               onTimeUpdate={(e) => setVideoCurrentTime(e.currentTarget.currentTime)}
               onLoadedMetadata={(e) => {
                 if (isFinite(e.currentTarget.duration)) {
@@ -300,8 +358,13 @@ export default function StudioPage() {
                 <TrackEditor
                   key={track.id}
                   track={track}
+                  canOverdub={recordingState === "recorded"}
+                  isOverdubbing={overdubbingTrackId === track.id}
                   onUpdate={handleTrackUpdate}
                   onRemove={handleRemoveTrack}
+                  onRecordTrack={handleRecordTrack}
+                  onStopRecordTrack={handleStopRecordTrack}
+                  onDuplicateTrack={handleDuplicateTrack}
                 />
               ))
             )}

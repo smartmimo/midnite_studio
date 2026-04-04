@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
+import { Jungle } from "./Jungle";
 
 export class AudioTrack {
   id: string;
@@ -11,6 +12,8 @@ export class AudioTrack {
   audioBlob: Blob | null = null;
 
   // Effects State
+  basePitch: number = 0;  // Hidden shift accumulated from duplications
+  pitch: number = 0;      // -12 to 12
   bass: number = 0;       // -20 to 20
   treble: number = 0;     // -20 to 20
   delayTime: number = 0;  // 0 to 1 seconds
@@ -80,6 +83,28 @@ export class AudioTrack {
     }
   }
 
+  clone(): AudioTrack {
+    const newTrack = new AudioTrack();
+    // Copy effects
+    newTrack.basePitch = this.basePitch + this.pitch;
+    newTrack.pitch = 0;
+    newTrack.bass = this.bass;
+    newTrack.treble = this.treble;
+    newTrack.delayTime = this.delayTime;
+    newTrack.feedback = this.feedback;
+    newTrack.echoMix = this.echoMix;
+    newTrack.reverbMix = this.reverbMix;
+    newTrack.volume = this.volume;
+    newTrack.isMuted = this.isMuted;
+
+    // Copy audio data
+    newTrack.duration = this.duration;
+    newTrack.audioBlob = this.audioBlob;
+    
+    // Note: Live MediaStream and recorder are intentionally NOT cloned.
+    return newTrack;
+  }
+
   /**
    * Sets up the effects graph in a given context (live AudioContext or OfflineAudioContext).
    * Returns the final OutputMixer node so it can be connected to the context's destination.
@@ -91,6 +116,14 @@ export class AudioTrack {
     // Provide a way to interact with nodes dynamically if we are in live playback
     storeNodes?: (nodes: any) => void 
   ): AudioNode {
+    // 0. Pitch Shift
+    const jungle = new Jungle(ctx);
+    const totalPitch = this.basePitch + this.pitch;
+    const pitchRatio = Math.pow(2, totalPitch / 12);
+    jungle.setPitchOffset(pitchRatio - 1);
+    
+    sourceNode.connect(jungle.input);
+
     // 1. EQ
     const bassNode = ctx.createBiquadFilter();
     bassNode.type = "lowshelf";
@@ -105,7 +138,7 @@ export class AudioTrack {
     // 2. Bus
     const eqBus = ctx.createGain();
     
-    sourceNode.connect(bassNode);
+    jungle.output.connect(bassNode);
     bassNode.connect(trebleNode);
     trebleNode.connect(eqBus);
 
@@ -149,6 +182,7 @@ export class AudioTrack {
 
     if (storeNodes) {
       storeNodes({
+        jungle,
         bassNode,
         trebleNode,
         delayNode,

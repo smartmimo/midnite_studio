@@ -141,6 +141,11 @@ export class AudioManager {
   updateLiveNodes(track: AudioTrack) {
     const nodes = this.liveNodesMap.get(track.id);
     if (nodes) {
+      if (nodes.jungle) {
+        const totalPitch = track.basePitch + track.pitch;
+        const pitchRatio = Math.pow(2, totalPitch / 12);
+        nodes.jungle.setPitchOffset(pitchRatio - 1);
+      }
       nodes.bassNode.gain.value = track.bass;
       nodes.trebleNode.gain.value = track.treble;
       nodes.delayNode.delayTime.value = track.delayTime;
