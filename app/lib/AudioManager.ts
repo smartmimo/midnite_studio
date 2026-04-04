@@ -1,4 +1,5 @@
 import { AudioTrack } from "./AudioTrack";
+import { Jungle } from "./Jungle";
 
 // Generate a simple synthetic impulse response for the Reverb effect
 function createSyntheticImpulseResponse(ctx: BaseAudioContext): AudioBuffer {
@@ -89,6 +90,38 @@ export class AudioManager {
     const track = this.tracks.find(t => t.id === id);
     if (track) track.disconnectDevice();
     this.tracks = this.tracks.filter(t => t.id !== id);
+  }
+
+  async duplicateWithBakedPitch(id: string, newPitch: number): Promise<AudioTrack | null> {
+    this.initCtx();
+    const original = this.tracks.find(t => t.id === id);
+    if (!original || !original.audioBlob) return null;
+
+    const arrayBuffer = await original.audioBlob.arrayBuffer();
+    const buffer = await this.ctx!.decodeAudioData(arrayBuffer);
+
+    const offlineCtx = new OfflineAudioContext(buffer.numberOfChannels, buffer.length, buffer.sampleRate);
+    
+    const sourceNode = offlineCtx.createBufferSource();
+    sourceNode.buffer = buffer;
+
+    const jungle = new Jungle(offlineCtx);
+    const pitchRatio = Math.pow(2, newPitch / 12);
+    jungle.setPitchOffset(pitchRatio - 1);
+
+    sourceNode.connect(jungle.input);
+    jungle.output.connect(offlineCtx.destination);
+    sourceNode.start(0);
+
+    const renderedBuffer = await offlineCtx.startRendering();
+    const newBlob = audioBufferToWav(renderedBuffer);
+
+    const duplicate = original.clone();
+    duplicate.audioBlob = newBlob;
+    duplicate.pitch = 0;
+    duplicate.basePitch = 0;
+    
+    return duplicate;
   }
 
   startRecordingAll() {

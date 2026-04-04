@@ -100,11 +100,24 @@ export default function StudioPage() {
     setTracks([...audioManager.tracks]);
   };
 
-  const handleDuplicateTrack = (id: string, newPitch: number) => {
+  const handleDuplicateTrack = async (id: string, newPitch: number) => {
     const original = audioManager.tracks.find(t => t.id === id);
     if (!original) return;
     
-    const duplicate = original.clone();
+    // Natively bake the pitch into the duplicate's raw audio buffer
+    const duplicate = await audioManager.duplicateWithBakedPitch(id, newPitch);
+    
+    if (!duplicate) {
+       // fallback if no recording present
+       const clone = original.clone();
+       const baseName = original.name.replace(/^\[[+-]?\d+\]\s*/, '');
+       const pitchPrefix = newPitch === 0 ? '' : `[${newPitch > 0 ? '+' + newPitch : newPitch}] `;
+       clone.name = `${pitchPrefix}${baseName}`;
+       audioManager.addTrack(clone);
+       setTracks([...audioManager.tracks]);
+       return;
+    }
+
     const baseName = original.name.replace(/^\[[+-]?\d+\]\s*/, '');
     const pitchPrefix = newPitch === 0 ? '' : `[${newPitch > 0 ? '+' + newPitch : newPitch}] `;
     duplicate.name = `${pitchPrefix}${baseName}`;
