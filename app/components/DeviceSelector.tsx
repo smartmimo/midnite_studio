@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Camera, Mic, Plus } from "lucide-react";
+import { Camera, Mic, Plus, RefreshCw } from "lucide-react";
 import { useMediaDevices } from "../hooks/useMediaDevices";
 
 interface Props {
@@ -8,7 +8,7 @@ interface Props {
 }
 
 export function DeviceSelector({ onVideoDeviceSelect, onAddAudioTrack }: Props) {
-  const { videoDevices, audioDevices } = useMediaDevices();
+  const { videoDevices, audioDevices, error, loadDevices } = useMediaDevices();
   const [selectedVideo, setSelectedVideo] = useState<string>("");
   const [selectedAudio, setSelectedAudio] = useState<string>("");
 
@@ -26,6 +26,25 @@ export function DeviceSelector({ onVideoDeviceSelect, onAddAudioTrack }: Props) 
   return (
     <div className="flex flex-col gap-8">
       
+      {error && (
+        <div className="text-red-400 text-[10px] p-3 rounded-xl border border-red-400/20 bg-red-400/5">
+          <p className="mb-2">Device access denied. Please click allow in your browser or click retry.</p>
+          <button onClick={loadDevices} className="w-full bg-red-400/20 hover:bg-red-400/30 p-2 rounded-lg font-bold transition-colors">
+            Retry Permissions
+          </button>
+        </div>
+      )}
+
+      {audioDevices.length === 0 && videoDevices.length === 0 && !error && (
+        <button 
+          onClick={loadDevices} 
+          className="w-full flex justify-center items-center gap-2 bg-white/10 hover:bg-studio-accent border border-white/10 text-white p-3 rounded-xl font-semibold transition-all"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Scan Devices
+        </button>
+      )}
+
       {/* Video Selection */}
       <div className="flex flex-col gap-3">
         <h3 className="text-xs font-bold tracking-widest text-gray-500 uppercase flex items-center gap-2">

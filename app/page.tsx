@@ -9,7 +9,7 @@ import { ExportEngine } from "./lib/exportEngine";
 import { DeviceSelector } from "./components/DeviceSelector";
 import { TrackEditor } from "./components/TrackEditor";
 import { RecorderControls } from "./components/RecorderControls";
-import { Play, Pause, Download, Loader2 } from "lucide-react";
+import { Play, Pause, Download, Loader2, Menu, X } from "lucide-react";
 
 function formatTime(seconds: number) {
   if (typeof seconds !== 'number' || !isFinite(seconds) || isNaN(seconds)) return "0:00.000";
@@ -35,6 +35,7 @@ export default function StudioPage() {
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [overdubbingTrackId, setOverdubbingTrackId] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const handleVideoDeviceSelect = async (deviceId: string) => {
     try {
@@ -239,15 +240,23 @@ export default function StudioPage() {
   }, [audioManager, videoManager]);
 
   return (
-    <main className="h-screen w-screen flex overflow-hidden text-sm">
+    <main className="h-screen w-screen flex overflow-hidden text-sm relative">
 
       {/* LEFT SIDEBAR - The Setup */}
-      <aside className="w-80 shrink-0 bg-black/60 backdrop-blur-3xl border-r border-white/10 flex flex-col relative z-20">
-        <div className="p-6 border-b border-white/5">
-          <h1 className="text-2xl font-black tracking-tighter">
-            Midnite<span className="text-studio-accent">Studio</span>
-          </h1>
-          <p className="text-gray-500 mt-1 text-xs font-medium uppercase tracking-widest">Mastering Session</p>
+      <aside className={`w-80 shrink-0 bg-black/60 backdrop-blur-3xl border-r border-white/10 flex flex-col z-50 transition-transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 absolute md:relative h-full`}>
+        <div className="p-6 border-b border-white/5 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-black tracking-tighter">
+              Midnite<span className="text-studio-accent">Studio</span>
+            </h1>
+            <p className="text-gray-500 mt-1 text-xs font-medium uppercase tracking-widest">Mastering Session</p>
+          </div>
+          <button 
+            onClick={() => setIsSidebarOpen(false)} 
+            className="md:hidden text-gray-500 hover:text-white p-1 bg-white/5 rounded"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
@@ -259,10 +268,17 @@ export default function StudioPage() {
       </aside>
 
       {/* RIGHT MAIN AREA */}
-      <section className="flex-1 flex flex-col min-w-0 relative">
+      <section className="flex-1 flex flex-col min-w-0 relative w-full">
+        {/* Mobile menu toggle */}
+        <button 
+          onClick={() => setIsSidebarOpen(true)}
+          className="md:hidden absolute top-4 left-4 z-40 p-2 bg-black/50 hover:bg-black/80 rounded-full border border-white/10 text-white backdrop-blur-md shadow-lg transition-colors"
+        >
+          <Menu className="w-4 h-4" />
+        </button>
 
         {/* TOP STAGE - Video Preview */}
-        <div className="flex-1 p-2 flex flex-col gap-2 items-center justify-center relative overflow-hidden">
+        <div className="flex-1 p-2 md:p-6 flex flex-col gap-2 items-center justify-center relative overflow-hidden">
           <div className="w-full max-w-5xl aspect-video glass-panel rounded-3xl overflow-hidden relative shadow-2xl transition-all shrink">
             <video
               ref={videoRef}
