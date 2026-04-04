@@ -99,7 +99,7 @@ export class AudioManager {
     await Promise.all(this.tracks.map(t => t.stopRecording()));
   }
 
-  async playPreview() {
+  async playPreview(offset: number = 0) {
     this.initCtx();
     this.stopPreview(); // clear previous
 
@@ -125,7 +125,7 @@ export class AudioManager {
 
     // Start all exactly at current time
     const startTime = this.ctx.currentTime + 0.1; 
-    this.liveSources.forEach(src => src.start(startTime));
+    this.liveSources.forEach(src => src.start(startTime, offset));
   }
 
   stopPreview() {

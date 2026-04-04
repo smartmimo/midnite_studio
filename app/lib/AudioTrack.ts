@@ -20,6 +20,10 @@ export class AudioTrack {
   volume: number = 1;     // 0 to 2
   isMuted: boolean = false;
 
+  // Track Length
+  startTime: number = 0;
+  duration: number = 0;
+
   constructor(id?: string) {
     this.id = id || uuidv4();
   }
@@ -46,6 +50,7 @@ export class AudioTrack {
   startRecording() {
     if (!this.stream) throw new Error("No audio stream");
     this.chunks = [];
+    this.startTime = Date.now();
     this.recorder = new MediaRecorder(this.stream);
     this.recorder.ondataavailable = (e) => {
       if (e.data.size > 0) this.chunks.push(e.data);
@@ -60,6 +65,7 @@ export class AudioTrack {
         return;
       }
       this.recorder.onstop = () => {
+        this.duration = (Date.now() - this.startTime) / 1000;
         this.audioBlob = new Blob(this.chunks, { type: "audio/webm;codecs=opus" });
         resolve(this.audioBlob);
       };
