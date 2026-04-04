@@ -94,35 +94,11 @@ export class AudioManager {
   }
 
   async duplicateWithBakedPitch(id: string, newPitch: number): Promise<AudioTrack | null> {
-    await this.initCtx();
     const original = this.tracks.find(t => t.id === id);
     if (!original || !original.audioBlob) return null;
 
-    const arrayBuffer = await original.audioBlob.arrayBuffer();
-    const buffer = await this.ctx!.decodeAudioData(arrayBuffer);
-
-    const offlineCtx = new OfflineAudioContext(buffer.numberOfChannels, buffer.length, buffer.sampleRate);
-    await SoundTouchNode.register(offlineCtx, '/soundtouch-processor.js');
-    
-    const sourceNode = offlineCtx.createBufferSource();
-    sourceNode.buffer = buffer;
-
-    const pitchShifter = new SoundTouchNode(offlineCtx);
-    const pitchRatio = Math.pow(2, newPitch / 12);
-    pitchShifter.pitch.value = pitchRatio;
-    pitchShifter.tempo.value = 1.0;
-
-    sourceNode.connect(pitchShifter);
-    pitchShifter.connect(offlineCtx.destination);
-    sourceNode.start(0);
-
-    const renderedBuffer = await offlineCtx.startRendering();
-    const newBlob = audioBufferToWav(renderedBuffer);
-
+    // clone() already cascades basePitch + pitch correctly and inherits the raw audioBlob
     const duplicate = original.clone();
-    duplicate.audioBlob = newBlob;
-    duplicate.pitch = 0;
-    duplicate.basePitch = 0;
     
     return duplicate;
   }
