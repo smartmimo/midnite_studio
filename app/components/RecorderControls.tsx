@@ -29,11 +29,11 @@ export function RecorderControls({
       {recordingState !== "recording" ? (
         <button
           onClick={onRecord}
-          disabled={!canRecord || recordingState === "recording"}
+          disabled={!canRecord}
           className={`
             flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs tracking-widest uppercase transition-all duration-300
-            ${!canRecord 
-              ? "bg-white/5 text-gray-600 border border-white/5 cursor-not-allowed" 
+            ${!canRecord
+              ? "bg-white/5 text-gray-600 border border-white/5 cursor-not-allowed"
               : "bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white hover:shadow-[0_0_20px_rgba(239,68,68,0.3)] shadow-lg"
             }
           `}
@@ -54,7 +54,7 @@ export function RecorderControls({
       {recordingState === "recorded" && (
         <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-4 duration-500">
           <div className="w-px h-6 bg-white/10 mx-1" />
-          
+
           <button
             onClick={onTogglePlay}
             className="flex items-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-green-500/20 text-gray-300 hover:text-green-400 border border-white/10 hover:border-green-500/50 rounded-xl font-bold text-xs tracking-widest uppercase transition-all"
