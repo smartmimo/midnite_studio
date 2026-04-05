@@ -43,6 +43,7 @@ export default function StudioPage() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [overdubbingTrackId, setOverdubbingTrackId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isMixerCollapsed, setIsMixerCollapsed] = useState(false);
 
   // Refs for 60fps playhead — bypasses React state entirely
   const playheadRef = useRef<HTMLDivElement>(null);
@@ -320,11 +321,11 @@ export default function StudioPage() {
         </button>
 
         {/* TOP STAGE - Video + Waveform Panel */}
-        <div className="flex-1 p-2 md:p-4 flex flex-row gap-3 items-stretch overflow-hidden min-h-0">
+        <div className={`flex-1 p-2 md:p-4 flex flex-col md:flex-row gap-3 items-stretch overflow-hidden min-h-0 ${isMixerCollapsed ? 'mb-0' : ''}`}>
 
-          {/* Square Video Preview */}
-          <div className="w-56 md:w-64 shrink-0 flex flex-col gap-2">
-            <div className="w-full aspect-square glass-panel rounded-2xl overflow-hidden relative shadow-2xl">
+          {/* Square/Video Video Preview */}
+          <div className="w-full md:w-64 shrink-0 flex flex-col gap-2">
+            <div className="w-full aspect-video md:aspect-square glass-panel rounded-2xl overflow-hidden relative shadow-2xl">
               <video
                 ref={videoRef}
                 src={videoSrc || undefined}
@@ -499,25 +500,30 @@ export default function StudioPage() {
               </div>
             )}
           </div>
-
-          <div className="flex items-center gap-4 text-gray-500">
-            <div className="flex flex-col items-end">
-              <span className="text-[10px] font-bold tracking-widest uppercase text-gray-400">Project Status</span>
-              <span className="text-[9px] font-medium opacity-60">
-                {recordingState === 'idle' ? 'Ready to capture' : recordingState === 'recording' ? 'Capturing streams...' : 'Session recorded'}
-              </span>
-            </div>
-          </div>
         </div>
 
         {/* BOTTOM MIXER - Audio Channels */}
-        <div className="h-[420px] shrink-0 bg-black/60 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] border-t border-white/10 backdrop-blur-2xl flex flex-col z-10">
-          <div className="px-6 py-3 border-b border-white/5 flex items-center justify-between">
-            <h2 className="text-[10px] font-black tracking-[0.2em] text-gray-400 uppercase">Input Audio Console</h2>
-            <span className="text-[10px] text-gray-600 font-bold tracking-widest">{tracks.length} ACTIVE CHANNELS</span>
+        <div className={`
+          shrink-0 bg-black/60 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] border-t border-white/10 backdrop-blur-2xl flex flex-col z-10 transition-all duration-500
+          ${isMixerCollapsed ? 'h-[48px]' : 'h-[360px] md:h-[420px]'}
+        `}>
+          <div className="px-6 py-3 border-b border-white/5 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors" onClick={() => setIsMixerCollapsed(!isMixerCollapsed)}>
+            <div className="flex items-center gap-4">
+              <h2 className="text-[10px] font-black tracking-[0.2em] text-gray-400 uppercase">Input Audio Console</h2>
+              <span className="text-[10px] text-gray-600 font-bold tracking-widest hidden md:inline">{tracks.length} ACTIVE CHANNELS</span>
+            </div>
+            
+            <button className="flex items-center gap-1.5 px-3 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[10px] font-bold text-gray-300 transition-all">
+              {isMixerCollapsed ? (
+                <>Expand <span className="text-studio-accent">Mixer</span></>
+              ) : (
+                <>Collapse</>
+              )}
+            </button>
           </div>
 
-          <div className="flex-1 flex items-stretch gap-4 p-6 overflow-x-auto overflow-y-hidden custom-scrollbar">
+          {!isMixerCollapsed && (
+            <div className="flex-1 flex items-stretch gap-4 p-6 overflow-x-auto overflow-y-hidden custom-scrollbar animate-in fade-in slide-in-from-bottom-2 duration-300">
             {tracks.length === 0 ? (
               <div className="flex-1 flex items-center justify-center border-2 border-dashed border-white/10 rounded-2xl text-gray-500/50 font-bold uppercase tracking-widest text-lg">
                 Add a channel to begin mixing
@@ -539,6 +545,7 @@ export default function StudioPage() {
               ))
             )}
           </div>
+          )}
         </div>
 
       </section>

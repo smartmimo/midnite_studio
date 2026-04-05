@@ -91,7 +91,7 @@ export function TrackEditor({ track, canOverdub, isOverdubbing, onUpdate, onRemo
       </div>
 
       {/* FX Section */}
-      <div className="flex flex-col gap-4 p-5 flex-1 overflow-y-auto custom-scrollbar">
+      <div className="flex flex-col gap-4 px-6 py-5 flex-1 overflow-y-auto custom-scrollbar">
         <MiniSlider
           label="PITCH" value={track.pitch} min={-12} max={12} step={1}
           format={(v: number) => {
@@ -144,7 +144,8 @@ function MiniSlider({ label, value, min, max, step, onChange, format = (v: numbe
       <input
         type="range" min={min} max={max} step={step} value={value}
         onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="w-full"
+        className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-studio-accent touch-action-pan-y"
+        style={{ touchAction: 'pan-y' }}
       />
     </div>
   );
