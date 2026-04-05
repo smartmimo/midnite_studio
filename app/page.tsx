@@ -164,15 +164,16 @@ export default function StudioPage() {
   const handleStop = async () => {
     setRecordingState("idle");
 
-    if (overdubbingTrackId) {
-      if (videoRef.current) videoRef.current.pause();
-      audioManager.stopPreview();
-      setIsPlaying(false);
-    }
+    if (videoRef.current) videoRef.current.pause();
+    audioManager.stopPreview();
+    setIsPlaying(false);
 
     const videoPromise = videoManager.stream ? videoManager.stopRecording() : Promise.resolve(null);
     const audioPromise = audioManager.stopRecordingAll();
     await Promise.all([videoPromise, audioPromise]);
+
+    // Pre-decode so playback is instant
+    await audioManager.decodeAllTracks();
 
     const finalVideoBlob = videoManager.finalBlob;
     if (finalVideoBlob && finalVideoBlob.size > 0 && !overdubbingTrackId) {

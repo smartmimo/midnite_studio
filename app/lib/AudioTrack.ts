@@ -9,6 +9,14 @@ export class AudioTrack {
   recorder: MediaRecorder | null = null;
   chunks: Blob[] = [];
   audioBlob: Blob | null = null;
+  audioBuffer: AudioBuffer | null = null;
+
+  async decodeBlob(ctx: BaseAudioContext) {
+    if (!this.audioBlob || this.audioBuffer) return this.audioBuffer;
+    const arrayBuffer = await this.audioBlob.arrayBuffer();
+    this.audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+    return this.audioBuffer;
+  }
 
   // Effects State
   basePitch: number = 0;  // Hidden shift accumulated from duplications

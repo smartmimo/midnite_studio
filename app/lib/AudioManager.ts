@@ -82,6 +82,9 @@ export class AudioManager {
       (window as any).SoundTouchNodeClass = mod.SoundTouchNode;
       await mod.SoundTouchNode.register(this.ctx, '/soundtouch-processor.js');
     }
+    if (this.ctx.state === "suspended") {
+      await this.ctx.resume();
+    }
   }
 
   addTrack(track: AudioTrack) {
@@ -112,20 +115,23 @@ export class AudioManager {
     await Promise.all(this.tracks.map(t => t.stopRecording()));
   }
 
-  async playPreview(offset: number = 0) {
+  async decodeAllTracks() {
     await this.initCtx();
+    if (!this.ctx) return;
+    await Promise.all(this.tracks.map(t => t.decodeBlob(this.ctx!)));
+  }
+
+  async playPreview(offset: number = 0) {
+    await this.decodeAllTracks();
     this.stopPreview(); // clear previous
 
     if (!this.ctx) return;
 
     for (const track of this.tracks) {
-      if (!track.audioBlob) continue;
-
-      const arrayBuffer = await track.audioBlob.arrayBuffer();
-      const audioBuffer = await this.ctx.decodeAudioData(arrayBuffer);
+      if (!track.audioBuffer) continue;
 
       const sourceNode = this.ctx.createBufferSource();
-      sourceNode.buffer = audioBuffer;
+      sourceNode.buffer = track.audioBuffer;
       this.liveSources.push(sourceNode);
 
       const storeNodes = (nodes: any) => {
@@ -187,11 +193,12 @@ export class AudioManager {
 
     for (const track of this.tracks) {
       if (!track.audioBlob) continue;
-      const arrayBuffer = await track.audioBlob.arrayBuffer();
-      // Use standard ctx for decoding
-      const decoded = await this.ctx!.decodeAudioData(arrayBuffer);
-      buffers.push({ track, buffer: decoded });
-      if (decoded.length > maxLength) maxLength = decoded.length;
+      // This will use the cache if already decoded
+      const decoded = await track.decodeBlob(this.ctx!);
+      if (decoded) {
+        buffers.push({ track, buffer: decoded });
+        if (decoded.length > maxLength) maxLength = decoded.length;
+      }
     }
 
     if (buffers.length === 0) throw new Error("No recorded audio to export");
