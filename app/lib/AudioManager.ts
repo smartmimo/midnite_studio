@@ -5,12 +5,12 @@ function createSyntheticImpulseResponse(ctx: BaseAudioContext): AudioBuffer {
   const sampleRate = ctx.sampleRate;
   const length = sampleRate * 2.5; // 2.5s tail
   const buffer = ctx.createBuffer(2, length, sampleRate);
-  
+
   for (let channel = 0; channel < 2; channel++) {
     const channelData = buffer.getChannelData(channel);
     for (let i = 0; i < length; i++) {
-        const noise = (Math.random() * 2 - 1);
-        channelData[i] = noise * Math.exp(-i / (sampleRate * 0.3)); 
+      const noise = (Math.random() * 2 - 1);
+      channelData[i] = noise * Math.exp(-i / (sampleRate * 0.3));
     }
   }
   return buffer;
@@ -67,12 +67,12 @@ export class AudioManager {
   tracks: AudioTrack[] = [];
   ctx: AudioContext | null = null;
   impulseBuffer: AudioBuffer | null = null;
-  
+
   // Live preview tracking
   liveSources: AudioBufferSourceNode[] = [];
   liveNodesMap: Map<string, any> = new Map(); // to adjust values on the fly
 
-  constructor() {}
+  constructor() { }
 
   async initCtx() {
     if (!this.ctx) {
@@ -94,13 +94,13 @@ export class AudioManager {
     this.tracks = this.tracks.filter(t => t.id !== id);
   }
 
-  async duplicateWithBakedPitch(id: string, newPitch: number): Promise<AudioTrack | null> {
+  async duplicateWithBakedPitch(id: string): Promise<AudioTrack | null> {
     const original = this.tracks.find(t => t.id === id);
     if (!original || !original.audioBlob) return null;
 
     // clone() already cascades basePitch + pitch correctly and inherits the raw audioBlob
     const duplicate = original.clone();
-    
+
     return duplicate;
   }
 
@@ -120,7 +120,7 @@ export class AudioManager {
 
     for (const track of this.tracks) {
       if (!track.audioBlob) continue;
-      
+
       const arrayBuffer = await track.audioBlob.arrayBuffer();
       const audioBuffer = await this.ctx.decodeAudioData(arrayBuffer);
 
@@ -137,13 +137,13 @@ export class AudioManager {
     }
 
     // Start all exactly at current time
-    const startTime = this.ctx.currentTime + 0.1; 
+    const startTime = this.ctx.currentTime + 0.1;
     this.liveSources.forEach(src => src.start(startTime, offset));
   }
 
   stopPreview() {
     this.liveSources.forEach(src => {
-      try { src.stop(); } catch(e) {}
+      try { src.stop(); } catch (e) { }
       src.disconnect();
     });
     this.liveSources = [];
@@ -157,14 +157,14 @@ export class AudioManager {
       if (nodes.pitchShifter && nodes.pitchBypassGain && nodes.pitchEffectGain) {
         const totalPitch = track.basePitch + track.pitch;
         if (totalPitch === 0) {
-           nodes.pitchBypassGain.gain.value = 1;
-           nodes.pitchEffectGain.gain.value = 0;
+          nodes.pitchBypassGain.gain.value = 1;
+          nodes.pitchEffectGain.gain.value = 0;
         } else {
-           nodes.pitchBypassGain.gain.value = 0;
-           nodes.pitchEffectGain.gain.value = 1;
-           const pitchRatio = Math.pow(2, totalPitch / 12);
-           nodes.pitchShifter.pitch.value = pitchRatio;
-           nodes.pitchShifter.tempo.value = 1.0;
+          nodes.pitchBypassGain.gain.value = 0;
+          nodes.pitchEffectGain.gain.value = 1;
+          const pitchRatio = Math.pow(2, totalPitch / 12);
+          nodes.pitchShifter.pitch.value = pitchRatio;
+          nodes.pitchShifter.tempo.value = 1.0;
         }
       }
       nodes.bassNode.gain.value = track.bass;
@@ -184,7 +184,7 @@ export class AudioManager {
     // Decoded buffers
     const buffers: { track: AudioTrack, buffer: AudioBuffer }[] = [];
     let maxLength = 0;
-    
+
     for (const track of this.tracks) {
       if (!track.audioBlob) continue;
       const arrayBuffer = await track.audioBlob.arrayBuffer();

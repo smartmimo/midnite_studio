@@ -83,7 +83,7 @@ export default function StudioPage() {
 
     const track = audioManager.tracks.find(t => t.id === id);
     if (track) track.startRecording();
-    
+
     setOverdubbingTrackId(id);
   };
 
@@ -104,25 +104,25 @@ export default function StudioPage() {
   const handleDuplicateTrack = async (id: string, newPitch: number) => {
     const original = audioManager.tracks.find(t => t.id === id);
     if (!original) return;
-    
+
     // Natively bake the pitch into the duplicate's raw audio buffer
-    const duplicate = await audioManager.duplicateWithBakedPitch(id, newPitch);
-    
+    const duplicate = await audioManager.duplicateWithBakedPitch(id);
+
     if (!duplicate) {
-       // fallback if no recording present
-       const clone = original.clone();
-       const baseName = original.name.replace(/^\[[+-]?\d+\]\s*/, '');
-       const pitchPrefix = newPitch === 0 ? '' : `[${newPitch > 0 ? '+' + newPitch : newPitch}] `;
-       clone.name = `${pitchPrefix}${baseName}`;
-       audioManager.addTrack(clone);
-       setTracks([...audioManager.tracks]);
-       return;
+      // fallback if no recording present
+      const clone = original.clone();
+      const baseName = original.name.replace(/^\[[+-]?\d+\]\s*/, '');
+      const pitchPrefix = newPitch === 0 ? '' : `[${newPitch > 0 ? '+' + newPitch : newPitch}] `;
+      clone.name = `${pitchPrefix}${baseName}`;
+      audioManager.addTrack(clone);
+      setTracks([...audioManager.tracks]);
+      return;
     }
 
     const baseName = original.name.replace(/^\[[+-]?\d+\]\s*/, '');
     const pitchPrefix = newPitch === 0 ? '' : `[${newPitch > 0 ? '+' + newPitch : newPitch}] `;
     duplicate.name = `${pitchPrefix}${baseName}`;
-    
+
     audioManager.addTrack(duplicate);
     setTracks([...audioManager.tracks]);
   };
@@ -167,7 +167,7 @@ export default function StudioPage() {
         setVideoDuration(videoManager.duration);
       }
     }
-    
+
     setOverdubbingTrackId(null);
     setRecordingState("recorded");
   };
@@ -251,8 +251,8 @@ export default function StudioPage() {
             </h1>
             <p className="text-gray-500 mt-1 text-xs font-medium uppercase tracking-widest">Mastering Session</p>
           </div>
-          <button 
-            onClick={() => setIsSidebarOpen(false)} 
+          <button
+            onClick={() => setIsSidebarOpen(false)}
             className="md:hidden text-gray-500 hover:text-white p-1 bg-white/5 rounded"
           >
             <X className="w-5 h-5" />
@@ -270,7 +270,7 @@ export default function StudioPage() {
       {/* RIGHT MAIN AREA */}
       <section className="flex-1 flex flex-col min-w-0 relative w-full">
         {/* Mobile menu toggle */}
-        <button 
+        <button
           onClick={() => setIsSidebarOpen(true)}
           className="md:hidden absolute top-4 left-4 z-40 p-2 bg-black/50 hover:bg-black/80 rounded-full border border-white/10 text-white backdrop-blur-md shadow-lg transition-colors"
         >
