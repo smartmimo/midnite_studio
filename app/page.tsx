@@ -290,7 +290,6 @@ export default function StudioPage() {
             <h1 className="text-2xl font-black tracking-tighter">
               Midnite<span className="text-studio-accent">Studio</span>
             </h1>
-            <p className="text-gray-500 mt-1 text-xs font-medium uppercase tracking-widest">Mastering Session</p>
           </div>
           <button
             onClick={() => setIsSidebarOpen(false)}
@@ -329,7 +328,6 @@ export default function StudioPage() {
                 src={videoSrc || undefined}
                 className="w-full h-full object-cover bg-black"
                 muted
-                autoPlay
                 controls={false}
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
@@ -347,7 +345,7 @@ export default function StudioPage() {
                   <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
                   </div>
-                  <span className="font-bold tracking-widest uppercase text-[9px] text-center">STAGE<br/>OFFLINE</span>
+                  <span className="font-bold tracking-widest uppercase text-[9px] text-center">STAGE<br />OFFLINE</span>
                 </div>
               )}
               {recordingState === "recording" && (
@@ -484,7 +482,7 @@ export default function StudioPage() {
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z" /></svg>
                 </div>
                 <p className="text-[10px] font-bold tracking-widest uppercase text-center">
-                  Recorded waveforms<br/>will appear here
+                  Recorded waveforms<br />will appear here
                 </p>
               </div>
             )}
