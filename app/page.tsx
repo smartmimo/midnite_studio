@@ -9,7 +9,13 @@ import { ExportEngine } from "./lib/exportEngine";
 import { DeviceSelector } from "./components/DeviceSelector";
 import { TrackEditor } from "./components/TrackEditor";
 import { RecorderControls } from "./components/RecorderControls";
+import { RecordedWaveformTrack } from "./components/RecordedWaveformTrack";
 import { Play, Pause, Download, Loader2, Menu, X } from "lucide-react";
+
+const TRACK_COLORS = [
+  "#f43f5e", "#8b5cf6", "#06b6d4", "#10b981",
+  "#f59e0b", "#ec4899", "#3b82f6", "#a3e635",
+];
 
 function formatTime(seconds: number) {
   if (typeof seconds !== 'number' || !isFinite(seconds) || isNaN(seconds)) return "0:00.000";
@@ -37,6 +43,13 @@ export default function StudioPage() {
   const [overdubbingTrackId, setOverdubbingTrackId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // Refs for 60fps playhead — bypasses React state entirely
+  const playheadRef = useRef<HTMLDivElement>(null);
+  const progressFillRef = useRef<HTMLDivElement>(null);
+  const timeDisplayRef = useRef<HTMLSpanElement>(null);
+  const maxDurationRef = useRef<number>(1);
+  const animFrameRef = useRef<number>(0);
+
   const handleVideoDeviceSelect = async (deviceId: string) => {
     try {
       const stream = await videoManager.requestDevice(deviceId);
@@ -53,6 +66,8 @@ export default function StudioPage() {
   const handleAddAudioTrack = async (deviceId: string, name: string) => {
     const newTrack = new AudioTrack();
     newTrack.name = name;
+    // Assign a distinct color cycling through the palette
+    newTrack.color = TRACK_COLORS[audioManager.tracks.length % TRACK_COLORS.length];
     try {
       await newTrack.requestDevice(deviceId);
       audioManager.addTrack(newTrack);
@@ -239,6 +254,30 @@ export default function StudioPage() {
     };
   }, [audioManager, videoManager]);
 
+  // Keep maxDurationRef in sync for the RAF seek calculations
+  useEffect(() => {
+    const recTracks = tracks.filter(t => t.audioBlob && t.duration > 0);
+    maxDurationRef.current = recTracks.length > 0
+      ? Math.max(...recTracks.map(t => t.duration))
+      : Math.max(videoDuration || 1, 1);
+  }, [tracks, videoDuration]);
+
+  // 60fps playhead animation — reads video.currentTime directly, zero React re-renders
+  useEffect(() => {
+    const tick = () => {
+      animFrameRef.current = requestAnimationFrame(tick);
+      const video = videoRef.current;
+      const maxDur = maxDurationRef.current;
+      if (!video || maxDur <= 0) return;
+      const pct = Math.min(100, (video.currentTime / maxDur) * 100);
+      if (playheadRef.current) playheadRef.current.style.left = `${pct}%`;
+      if (progressFillRef.current) progressFillRef.current.style.width = `${pct}%`;
+      if (timeDisplayRef.current) timeDisplayRef.current.textContent = formatTime(video.currentTime);
+    };
+    animFrameRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animFrameRef.current);
+  }, []);
+
   return (
     <main className="h-screen w-screen flex overflow-hidden text-sm relative">
 
@@ -277,47 +316,46 @@ export default function StudioPage() {
           <Menu className="w-4 h-4" />
         </button>
 
-        {/* TOP STAGE - Video Preview */}
-        <div className="flex-1 p-2 md:p-6 flex flex-col gap-2 items-center justify-center relative overflow-hidden">
-          <div className="w-full max-w-5xl aspect-video glass-panel rounded-3xl overflow-hidden relative shadow-2xl transition-all shrink">
-            <video
-              ref={videoRef}
-              src={videoSrc || undefined}
-              className="w-full h-full object-contain bg-black"
-              muted // Local loopback muted
-              autoPlay
-              controls={false}
-              onPlay={() => setIsPlaying(true)}
-              onPause={() => setIsPlaying(false)}
-              onEnded={() => {
-                setIsPlaying(false);
-                if (overdubbingTrackId) {
-                  handleStopRecordTrack(overdubbingTrackId);
-                }
-              }}
-              onTimeUpdate={(e) => setVideoCurrentTime(e.currentTarget.currentTime)}
-              onLoadedMetadata={(e) => {
-                if (isFinite(e.currentTarget.duration)) {
-                  setVideoDuration(e.currentTarget.duration);
-                }
-              }}
-            />
-            {!videoRef.current?.srcObject && !videoSrc && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-500 gap-4">
-                <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center border border-white/10 shadow-[0_0_50px_rgba(255,255,255,0.05)]">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+        {/* TOP STAGE - Video + Waveform Panel */}
+        <div className="flex-1 p-2 md:p-4 flex flex-row gap-3 items-stretch overflow-hidden min-h-0">
+
+          {/* Square Video Preview */}
+          <div className="w-56 md:w-64 shrink-0 flex flex-col gap-2">
+            <div className="w-full aspect-square glass-panel rounded-2xl overflow-hidden relative shadow-2xl">
+              <video
+                ref={videoRef}
+                src={videoSrc || undefined}
+                className="w-full h-full object-cover bg-black"
+                muted
+                autoPlay
+                controls={false}
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
+                onEnded={() => {
+                  setIsPlaying(false);
+                  if (overdubbingTrackId) handleStopRecordTrack(overdubbingTrackId);
+                }}
+                onTimeUpdate={(e) => setVideoCurrentTime(e.currentTarget.currentTime)}
+                onLoadedMetadata={(e) => {
+                  if (isFinite(e.currentTarget.duration)) setVideoDuration(e.currentTarget.duration);
+                }}
+              />
+              {!videoRef.current?.srcObject && !videoSrc && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-500 gap-3">
+                  <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                  </div>
+                  <span className="font-bold tracking-widest uppercase text-[9px] text-center">STAGE<br/>OFFLINE</span>
                 </div>
-                <span className="font-bold tracking-widest uppercase text-xs">STAGE OFFLINE</span>
-              </div>
-            )}
-            {recordingState === "recording" && (
-              <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-1 text-[10px] font-black tracking-widest rounded-full shadow-[0_0_20px_rgba(239,68,68,0.8)] flex items-center gap-2 z-[100]">
-                <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div> REC
-              </div>
-            )}
+              )}
+              {recordingState === "recording" && (
+                <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-0.5 text-[9px] font-black tracking-widest rounded-full shadow-[0_0_15px_rgba(239,68,68,0.8)] flex items-center gap-1.5 z-[100]">
+                  <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div> REC
+                </div>
+              )}
+            </div>
 
-
-
+            {/* Recorder controls below video */}
             {recordingState !== "recorded" && (
               <RecorderControls
                 recordingState={recordingState}
@@ -331,42 +369,124 @@ export default function StudioPage() {
             )}
           </div>
 
-          {recordingState === "recorded" && videoSrc && (
-            <div className="w-[80%] max-w-md bg-black/60 backdrop-blur-xl px-4 py-2 rounded-full border border-white/5 flex items-center gap-3 shadow-2xl shrink-0 z-10 transition-all">
-              <button
-                onClick={handleTogglePlay}
-                className="flex items-center justify-center w-6 h-6 bg-white/5 hover:bg-green-500/20 text-gray-300 hover:text-green-400 border border-white/10 hover:border-green-500/50 rounded-full transition-all shrink-0 p-0"
-              >
-                {isPlaying ? <Pause className="w-3 h-3 fill-current" /> : <Play className="w-3 h-3 fill-current" />}
-              </button>
+          {/* Right Panel — DAW Timeline */}
+          <div className="flex-1 flex flex-col gap-2 min-w-0 min-h-0 overflow-hidden">
+            {recordingState === "recorded" ? (() => {
+              const recordedTracks = tracks.filter(t => t.audioBlob && t.duration > 0);
+              const maxDuration = recordedTracks.length > 0
+                ? Math.max(...recordedTracks.map(t => t.duration))
+                : (videoDuration || 1);
+              const handleTimelineSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                const newTime = ratio * maxDuration;
+                if (videoRef.current) {
+                  videoRef.current.currentTime = newTime;
+                  setVideoCurrentTime(newTime);
+                }
+                if (isPlaying) {
+                  audioManager.stopPreview();
+                  audioManager.playPreview(newTime);
+                }
+              };
 
-              <span className="text-white/60 text-[10px] font-mono tracking-widest w-16 text-right shrink-0">{formatTime(videoCurrentTime)}</span>
-              <input
-                type="range"
-                min={0}
-                max={videoDuration || 1}
-                step={0.01}
-                value={videoCurrentTime}
-                onChange={(e) => {
-                  if (videoRef.current) {
-                    const val = parseFloat(e.target.value);
-                    videoRef.current.currentTime = val;
-                    setVideoCurrentTime(val);
-                  }
-                }}
-                className="flex-1 accent-studio-accent h-1 bg-white/10 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-0 [&::-webkit-slider-thumb]:border-white active:[&::-webkit-slider-thumb]:border-[4px] active:[&::-webkit-slider-thumb]:bg-black [&::-webkit-slider-thumb]:rounded-full transition-all"
-              />
-              <span className="text-white/60 text-[10px] font-mono tracking-widest w-20 shrink-0">{formatTime(videoDuration)}</span>
+              const handleTimelineDrag = (e: React.MouseEvent<HTMLDivElement>) => {
+                if (e.buttons !== 1) return;
+                handleTimelineSeek(e);
+              };
 
-              <button
-                onClick={handleExport}
-                disabled={isExporting}
-                className="flex items-center justify-center w-6 h-6 bg-studio-accent text-white hover:bg-studio-accent-hover rounded-full transition-all shadow-[0_0_10px_rgba(244,63,94,0.4)] disabled:opacity-50 shrink-0"
-              >
-                {isExporting ? <Loader2 className=" h-3 animate-spin" /> : <Download className=" h-3" />}
-              </button>
-            </div>
-          )}
+              return (
+                <>
+                  {/* Timeline area */}
+                  <div
+                    className="flex-1 overflow-y-auto custom-scrollbar relative select-none cursor-crosshair"
+                    onClick={handleTimelineSeek}
+                    onMouseMove={handleTimelineDrag}
+                  >
+                    {/* Track rows */}
+                    <div className="flex flex-col gap-1.5 pb-2 relative min-h-full">
+                      {recordedTracks.length === 0 ? (
+                        <div className="flex-1 flex items-center justify-center text-gray-600 text-xs font-bold tracking-widest uppercase py-10">
+                          No recorded tracks
+                        </div>
+                      ) : (
+                        recordedTracks.map(track => (
+                          <RecordedWaveformTrack
+                            key={track.id}
+                            name={track.name}
+                            blob={track.audioBlob!}
+                            color={track.color}
+                            duration={track.duration}
+                            widthPercent={maxDuration > 0 ? (track.duration / maxDuration) * 100 : 100}
+                            isMuted={track.isMuted}
+                          />
+                        ))
+                      )}
+                    </div>
+
+                    {/* Shared playhead — position driven by 60fps RAF loop via ref */}
+                    {recordedTracks.length > 0 && (
+                      <div
+                        ref={playheadRef}
+                        className="absolute top-0 bottom-2 w-[2px] pointer-events-none z-20"
+                        style={{
+                          left: "0%",
+                          background: "rgba(255,255,255,0.9)",
+                          boxShadow: "0 0 6px 2px rgba(255,255,255,0.45), 0 0 16px 4px rgba(255,255,255,0.2)",
+                        }}
+                      />
+                    )}
+                  </div>
+
+                  {/* Compact footer: play/pause · time · export */}
+                  <div className="bg-black/60 backdrop-blur-xl px-4 py-2 rounded-2xl border border-white/5 flex items-center gap-3 shadow-xl shrink-0">
+                    <button
+                      onClick={handleTogglePlay}
+                      className="flex items-center justify-center w-7 h-7 bg-white/5 hover:bg-green-500/20 text-gray-300 hover:text-green-400 border border-white/10 hover:border-green-500/50 rounded-full transition-all shrink-0"
+                    >
+                      {isPlaying ? <Pause className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                    </button>
+
+                    <span ref={timeDisplayRef} className="text-white/60 text-[10px] font-mono tracking-widest">
+                      {formatTime(videoCurrentTime)}
+                    </span>
+                    <span className="text-white/20 text-[10px]">/</span>
+                    <span className="text-white/40 text-[10px] font-mono tracking-widest">
+                      {formatTime(maxDuration)}
+                    </span>
+
+                    {/* mini progress bar — width driven by 60fps RAF loop via ref */}
+                    <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
+                      <div
+                        ref={progressFillRef}
+                        className="h-full bg-white/40 rounded-full"
+                        style={{ width: "0%" }}
+                      />
+                    </div>
+
+                    <button
+                      onClick={handleExport}
+                      disabled={isExporting}
+                      className="flex items-center justify-center w-7 h-7 bg-studio-accent text-white hover:bg-studio-accent-hover rounded-full transition-all shadow-[0_0_10px_rgba(244,63,94,0.4)] disabled:opacity-50 shrink-0"
+                    >
+                      {isExporting ? <Loader2 className="h-3.5 animate-spin" /> : <Download className="h-3.5" />}
+                    </button>
+                  </div>
+                </>
+              );
+            })() : (
+              /* Pre-recording placeholder */
+              <div className="flex-1 glass-panel rounded-2xl flex flex-col items-center justify-center text-gray-600 gap-3 border-dashed">
+                <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z" /></svg>
+                </div>
+                <p className="text-[10px] font-bold tracking-widest uppercase text-center">
+                  Recorded waveforms<br/>will appear here
+                </p>
+              </div>
+            )}
+          </div>
+
 
         </div>
 

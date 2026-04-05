@@ -21,6 +21,7 @@ export class AudioTrack {
   reverbMix: number = 0;  // 0 to 1
   volume: number = 1;     // 0 to 2
   isMuted: boolean = false;
+  color: string = "#f43f5e";
 
   // Track Length
   startTime: number = 0;
@@ -108,6 +109,7 @@ export class AudioTrack {
     newTrack.reverbMix = this.reverbMix;
     newTrack.volume = this.volume;
     newTrack.isMuted = this.isMuted;
+    newTrack.color = this.color;
 
     // Copy audio data
     newTrack.duration = this.duration;

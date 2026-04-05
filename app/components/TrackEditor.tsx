@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Mic2, Trash2, Volume2, VolumeX, Circle, Square } from "lucide-react";
 import { AudioTrack } from "../lib/AudioTrack";
+import { MicWaveform } from "./MicWaveform";
 
 interface Props {
   track: AudioTrack;
@@ -31,6 +32,9 @@ export function TrackEditor({ track, canOverdub, isOverdubbing, onUpdate, onRemo
   return (
     <div className="glass-panel w-56 shrink-0 flex flex-col rounded-2xl overflow-hidden transition-all duration-300 hover:border-white/20 hover:shadow-[0_0_30px_rgba(244,63,94,0.1)] group">
       
+      {/* Live Waveform */}
+      <MicWaveform stream={track.stream} color={track.color} height={64} />
+
       {/* Strip Header */}
       <div className="bg-black/50 p-4 border-b border-white/5 flex items-center justify-between">
         <div className="flex items-center gap-2 overflow-hidden">
