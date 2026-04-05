@@ -68,10 +68,10 @@ export function MicWaveform({ stream, color, height = 64, sharedAudioCtx }: Prop
 
     // Use shared context or singleton
     const audioCtx = sharedAudioCtx || getSharedCtx();
-    
+
     // Ensure it's running (browsers suspend contexts until a user gesture)
     if (audioCtx.state === "suspended") {
-      audioCtx.resume().catch(() => {});
+      audioCtx.resume().catch(() => { });
     }
 
     const analyser = audioCtx.createAnalyser();
@@ -114,7 +114,7 @@ export function MicWaveform({ stream, color, height = 64, sharedAudioCtx }: Prop
       let x = 0;
 
       for (let i = 0; i < bufferLength; i++) {
-        const v = dataArray[i] / 128.0; 
+        const v = dataArray[i] / 128.0;
         const y = (v / 2) * canvas.height;
         if (i === 0) ctx2d.moveTo(x, y);
         else ctx2d.lineTo(x, y);

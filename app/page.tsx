@@ -357,7 +357,7 @@ export default function StudioPage() {
               )}
             </div>
           </div>
-          
+
           {/* Right Panel — DAW Timeline */}
           <div className="flex-1 flex flex-col gap-2 min-w-0 min-h-0 overflow-hidden">
             {recordingState === "recorded" ? (() => {
@@ -491,7 +491,7 @@ export default function StudioPage() {
               onTogglePlay={handleTogglePlay}
               onExport={handleExport}
             />
-            
+
             {recordingState === "recording" && (
               <div className="flex items-center gap-3 px-4 py-2 bg-red-500/10 rounded-xl border border-red-500/20 animate-pulse">
                 <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.8)]" />
@@ -501,12 +501,12 @@ export default function StudioPage() {
           </div>
 
           <div className="flex items-center gap-4 text-gray-500">
-             <div className="flex flex-col items-end">
-               <span className="text-[10px] font-bold tracking-widest uppercase text-gray-400">Project Status</span>
-               <span className="text-[9px] font-medium opacity-60">
-                 {recordingState === 'idle' ? 'Ready to capture' : recordingState === 'recording' ? 'Capturing streams...' : 'Session recorded'}
-               </span>
-             </div>
+            <div className="flex flex-col items-end">
+              <span className="text-[10px] font-bold tracking-widest uppercase text-gray-400">Project Status</span>
+              <span className="text-[9px] font-medium opacity-60">
+                {recordingState === 'idle' ? 'Ready to capture' : recordingState === 'recording' ? 'Capturing streams...' : 'Session recorded'}
+              </span>
+            </div>
           </div>
         </div>
 
