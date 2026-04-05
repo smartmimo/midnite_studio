@@ -252,8 +252,9 @@ export default function StudioPage() {
       audioManager.stopPreview();
       audioManager.tracks.forEach(t => t.disconnectDevice());
       videoManager.disconnect();
+      if (videoSrc) URL.revokeObjectURL(videoSrc);
     };
-  }, [audioManager, videoManager]);
+  }, [audioManager, videoManager, videoSrc]);
 
   // Keep maxDurationRef in sync for the RAF seek calculations
   useEffect(() => {
@@ -420,6 +421,7 @@ export default function StudioPage() {
                             duration={track.duration}
                             widthPercent={maxDuration > 0 ? (track.duration / maxDuration) * 100 : 100}
                             isMuted={track.isMuted}
+                            preDecodedBuffer={track.audioBuffer}
                           />
                         ))
                       )}
@@ -515,6 +517,7 @@ export default function StudioPage() {
                   onRecordTrack={handleRecordTrack}
                   onStopRecordTrack={handleStopRecordTrack}
                   onDuplicateTrack={handleDuplicateTrack}
+                  sharedAudioCtx={audioManager.context}
                 />
               ))
             )}

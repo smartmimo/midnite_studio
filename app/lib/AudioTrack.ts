@@ -69,6 +69,7 @@ export class AudioTrack {
   startRecording() {
     if (!this.stream) throw new Error("No audio stream");
     this.chunks = [];
+    this.audioBuffer = null;
     this.startTime = Date.now();
     try {
       // Force high quality audio bitrate (256 kbps)
@@ -91,6 +92,7 @@ export class AudioTrack {
       this.recorder.onstop = () => {
         this.duration = (Date.now() - this.startTime) / 1000;
         this.audioBlob = new Blob(this.chunks, { type: "audio/webm;codecs=opus" });
+        this.chunks = []; // Clear RAM
         resolve(this.audioBlob);
       };
       this.recorder.stop();

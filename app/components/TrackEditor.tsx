@@ -12,6 +12,7 @@ interface Props {
   onRecordTrack: (id: string) => void;
   onStopRecordTrack?: (id: string) => void;
   onDuplicateTrack?: (id: string, newPitch: number) => void;
+  sharedAudioCtx?: AudioContext | null;
 }
 function formatTime(seconds: number) {
   if (typeof seconds !== 'number' || !isFinite(seconds) || isNaN(seconds)) return "0:00";
@@ -20,7 +21,7 @@ function formatTime(seconds: number) {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export function TrackEditor({ track, canOverdub, isOverdubbing, onUpdate, onRemove, onRecordTrack, onStopRecordTrack, onDuplicateTrack }: Props) {
+export function TrackEditor({ track, canOverdub, isOverdubbing, onUpdate, onRemove, onRecordTrack, onStopRecordTrack, onDuplicateTrack, sharedAudioCtx }: Props) {
   const [, setTick] = useState(0);
   const triggerUpdate = () => {
     setTick(t => t + 1);
@@ -33,7 +34,7 @@ export function TrackEditor({ track, canOverdub, isOverdubbing, onUpdate, onRemo
     <div className="glass-panel w-56 shrink-0 flex flex-col rounded-2xl overflow-hidden transition-all duration-300 hover:border-white/20 hover:shadow-[0_0_30px_rgba(244,63,94,0.1)] group">
       
       {/* Live Waveform */}
-      <MicWaveform stream={track.stream} color={track.color} height={64} />
+      <MicWaveform stream={track.stream} color={track.color} height={64} sharedAudioCtx={sharedAudioCtx} />
 
       {/* Strip Header */}
       <div className="bg-black/50 p-4 border-b border-white/5 flex items-center justify-between">

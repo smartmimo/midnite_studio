@@ -14,36 +14,46 @@ interface Props {
   stream: MediaStream | null;
   color: string;
   height?: number;
+  /** Pass a shared AudioContext to avoid hitting browser limits (max 6-50) */
+  sharedAudioCtx?: AudioContext | null;
 }
 
-export function MicWaveform({ stream, color, height = 64 }: Props) {
+// Internal singleton to ensure we never have more than one context for visualizations if no shared one is provided
+let internalSharedCtx: AudioContext | null = null;
+function getSharedCtx() {
+  if (!internalSharedCtx || internalSharedCtx.state === "closed") {
+    internalSharedCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  }
+  return internalSharedCtx;
+}
+
+export function MicWaveform({ stream, color, height = 64, sharedAudioCtx }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>(0);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const ctxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx2d = canvas.getContext("2d");
+    const ctx2d = canvas.getContext("2d", { alpha: false });
     if (!ctx2d) return;
 
-    // Clean up previous
+    // Clean up previous nodes
     cancelAnimationFrame(rafRef.current);
     sourceRef.current?.disconnect();
     analyserRef.current?.disconnect();
-    ctxRef.current?.close().catch(() => {});
 
     if (!stream || stream.getAudioTracks().length === 0) {
       // Draw flat line
       const draw = () => {
         const W = canvas.offsetWidth;
         const H = canvas.offsetHeight;
-        canvas.width = W || 224;
-        canvas.height = H || height;
-        ctx2d.clearRect(0, 0, canvas.width, canvas.height);
-        ctx2d.fillStyle = hexToRgba(color, 0.06);
+        if (W > 0 && (canvas.width !== W || canvas.height !== H)) {
+          canvas.width = W;
+          canvas.height = H;
+        }
+        ctx2d.fillStyle = "#0c0c0c"; // match studio bg
         ctx2d.fillRect(0, 0, canvas.width, canvas.height);
         ctx2d.beginPath();
         ctx2d.moveTo(0, canvas.height / 2);
@@ -56,11 +66,16 @@ export function MicWaveform({ stream, color, height = 64 }: Props) {
       return;
     }
 
-    const audioCtx = new AudioContext();
-    ctxRef.current = audioCtx;
+    // Use shared context or singleton
+    const audioCtx = sharedAudioCtx || getSharedCtx();
+    
+    // Ensure it's running (browsers suspend contexts until a user gesture)
+    if (audioCtx.state === "suspended") {
+      audioCtx.resume().catch(() => {});
+    }
 
     const analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 1024;
+    analyser.fftSize = 512; // Lower for performance
     analyser.smoothingTimeConstant = 0.8;
     analyserRef.current = analyser;
 
@@ -72,7 +87,7 @@ export function MicWaveform({ stream, color, height = 64 }: Props) {
     const dataArray = new Uint8Array(bufferLength);
 
     const waveColor = hexToRgba(color, 1.0);
-    const bgColor = hexToRgba(color, 0.06);
+    const bgColor = "#0c0c0c";
 
     const drawFrame = () => {
       rafRef.current = requestAnimationFrame(drawFrame);
@@ -86,28 +101,23 @@ export function MicWaveform({ stream, color, height = 64 }: Props) {
 
       analyser.getByteTimeDomainData(dataArray);
 
-      ctx2d.clearRect(0, 0, canvas.width, canvas.height);
       ctx2d.fillStyle = bgColor;
       ctx2d.fillRect(0, 0, canvas.width, canvas.height);
 
       ctx2d.lineWidth = 2;
       ctx2d.strokeStyle = waveColor;
       ctx2d.shadowColor = waveColor;
-      ctx2d.shadowBlur = 6;
+      ctx2d.shadowBlur = 4;
       ctx2d.beginPath();
 
       const sliceWidth = canvas.width / bufferLength;
       let x = 0;
 
       for (let i = 0; i < bufferLength; i++) {
-        const v = dataArray[i] / 128.0; // 0..2
+        const v = dataArray[i] / 128.0; 
         const y = (v / 2) * canvas.height;
-
-        if (i === 0) {
-          ctx2d.moveTo(x, y);
-        } else {
-          ctx2d.lineTo(x, y);
-        }
+        if (i === 0) ctx2d.moveTo(x, y);
+        else ctx2d.lineTo(x, y);
         x += sliceWidth;
       }
 
@@ -121,9 +131,9 @@ export function MicWaveform({ stream, color, height = 64 }: Props) {
       cancelAnimationFrame(rafRef.current);
       source.disconnect();
       analyser.disconnect();
-      audioCtx.close().catch(() => {});
+      // WE DO NOT CLOSE THE SHARED CONTEXT HERE
     };
-  }, [stream, color, height]);
+  }, [stream, color, height, sharedAudioCtx]);
 
   return (
     <canvas

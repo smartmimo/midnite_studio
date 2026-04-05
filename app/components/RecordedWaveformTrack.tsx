@@ -19,9 +19,10 @@ interface Props {
   /** Width as a percentage of the timeline container (0–100) */
   widthPercent?: number;
   isMuted?: boolean;
+  preDecodedBuffer?: AudioBuffer | null;
 }
 
-export function RecordedWaveformTrack({ name, blob, color, duration, widthPercent = 100, isMuted = false }: Props) {
+export function RecordedWaveformTrack({ name, blob, color, duration, widthPercent = 100, isMuted = false, preDecodedBuffer }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [decoded, setDecoded] = useState(false);
 
@@ -29,46 +30,54 @@ export function RecordedWaveformTrack({ name, blob, color, duration, widthPercen
     if (!blob || blob.size === 0) return;
     let cancelled = false;
 
+    const renderWaveform = (audioBuffer: AudioBuffer) => {
+      if (cancelled) return;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const W = canvas.offsetWidth || 400;
+      const H = canvas.offsetHeight || 80;
+      canvas.width = W;
+      canvas.height = H;
+
+      const rawData = audioBuffer.getChannelData(0);
+      const step = Math.ceil(rawData.length / W);
+      const ctx2d = canvas.getContext("2d", { alpha: false });
+      if (!ctx2d) return;
+
+      // Background
+      ctx2d.fillStyle = "#0c0c0c"; // use solid bg for perf
+      ctx2d.fillRect(0, 0, W, H);
+
+      // Waveform bars
+      ctx2d.fillStyle = hexToRgba(color, 1.0);
+      ctx2d.shadowColor = color;
+      ctx2d.shadowBlur = 4;
+
+      for (let i = 0; i < W; i++) {
+        let min = 1.0, max = -1.0;
+        for (let j = 0; j < step; j++) {
+          const datum = rawData[i * step + j] ?? 0;
+          if (datum < min) min = datum;
+          if (datum > max) max = datum;
+        }
+        const barH = Math.max(1, (max - min) * H * 0.9);
+        const y = H / 2 - barH / 2;
+        ctx2d.fillRect(i, y, 1, barH);
+      }
+      setDecoded(true);
+    };
+
+    if (preDecodedBuffer) {
+      renderWaveform(preDecodedBuffer);
+      return;
+    }
+
     blob.arrayBuffer().then((buf) => {
       if (cancelled) return;
-      const offlineCtx = new OfflineAudioContext(1, 44100 * (duration || 10), 44100);
+      const offlineCtx = new OfflineAudioContext(1, 44100 * (duration || 1), 44100);
       return offlineCtx.decodeAudioData(buf).then((audioBuffer) => {
-        if (cancelled) return;
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-
-        const W = canvas.offsetWidth || 400;
-        const H = canvas.offsetHeight || 80;
-        canvas.width = W;
-        canvas.height = H;
-
-        const rawData = audioBuffer.getChannelData(0);
-        const step = Math.ceil(rawData.length / W);
-        const ctx2d = canvas.getContext("2d");
-        if (!ctx2d) return;
-
-        // Background
-        ctx2d.fillStyle = hexToRgba(color, 0.08);
-        ctx2d.fillRect(0, 0, W, H);
-
-        // Waveform bars
-        ctx2d.fillStyle = hexToRgba(color, 1.0);
-        ctx2d.shadowColor = color;
-        ctx2d.shadowBlur = 4;
-
-        for (let i = 0; i < W; i++) {
-          let min = 1.0, max = -1.0;
-          for (let j = 0; j < step; j++) {
-            const datum = rawData[i * step + j] ?? 0;
-            if (datum < min) min = datum;
-            if (datum > max) max = datum;
-          }
-          const barH = Math.max(1, (max - min) * H * 0.9);
-          const y = H / 2 - barH / 2;
-          ctx2d.fillRect(i, y, 1, barH);
-        }
-
-        setDecoded(true);
+        renderWaveform(audioBuffer);
       });
     }).catch(console.error);
 

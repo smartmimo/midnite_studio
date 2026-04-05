@@ -67,6 +67,7 @@ export class AudioManager {
   tracks: AudioTrack[] = [];
   ctx: AudioContext | null = null;
   impulseBuffer: AudioBuffer | null = null;
+  private soundTouchRegistered: boolean = false;
 
   // Live preview tracking
   liveSources: AudioBufferSourceNode[] = [];
@@ -75,16 +76,30 @@ export class AudioManager {
   constructor() { }
 
   async initCtx() {
+    if (this.ctx && this.ctx.state === "closed") {
+      this.ctx = null;
+      this.soundTouchRegistered = false;
+    }
+
     if (!this.ctx) {
       this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+
+    if (!this.soundTouchRegistered) {
       this.impulseBuffer = createSyntheticImpulseResponse(this.ctx);
       const mod = await import("@soundtouchjs/audio-worklet");
       (window as any).SoundTouchNodeClass = mod.SoundTouchNode;
       await mod.SoundTouchNode.register(this.ctx, '/soundtouch-processor.js');
+      this.soundTouchRegistered = true;
     }
+
     if (this.ctx.state === "suspended") {
       await this.ctx.resume();
     }
+  }
+
+  get context(): AudioContext | null {
+    return this.ctx;
   }
 
   addTrack(track: AudioTrack) {
