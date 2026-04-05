@@ -166,8 +166,8 @@ export class AudioManager {
     }
 
     // Start all exactly at current time
-    const startTime = this.ctx.currentTime + 0.1;
-    this.liveSources.forEach(src => src.start(startTime, offset));
+    const when = (this.ctx?.currentTime || 0) + 0.15;
+    this.liveSources.forEach(src => src.start(when, offset));
   }
 
   stopPreview() {
@@ -194,19 +194,12 @@ export class AudioManager {
   updateLiveNodes(track: AudioTrack) {
     const nodes = this.liveNodesMap.get(track.id);
     if (nodes) {
-      if (nodes.pitchShifter && nodes.pitchBypassGain && nodes.pitchEffectGain) {
-        const totalPitch = track.basePitch + track.pitch;
-        if (totalPitch === 0) {
-          nodes.pitchBypassGain.gain.value = 1;
-          nodes.pitchEffectGain.gain.value = 0;
-        } else {
-          nodes.pitchBypassGain.gain.value = 0;
-          nodes.pitchEffectGain.gain.value = 1;
-          const pitchRatio = Math.pow(2, totalPitch / 12);
-          nodes.pitchShifter.pitch.value = pitchRatio;
-          nodes.pitchShifter.tempo.value = 1.0;
-        }
+      const totalPitch = track.basePitch + track.pitch;
+      const pitchRatio = Math.pow(2, totalPitch / 12);
+      if (nodes.pitchShifter) {
+        nodes.pitchShifter.pitch.value = pitchRatio;
       }
+      
       nodes.bassNode.gain.value = track.bass;
       nodes.trebleNode.gain.value = track.treble;
       nodes.delayNode.delayTime.value = track.delayTime;

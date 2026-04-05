@@ -38,6 +38,7 @@ export default function StudioPage() {
 
   const [videoCurrentTime, setVideoCurrentTime] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
+  const canRecord = tracks.length > 0 || !!videoManager.stream;
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [overdubbingTrackId, setOverdubbingTrackId] = useState<string | null>(null);
@@ -286,7 +287,8 @@ export default function StudioPage() {
       {/* LEFT SIDEBAR - The Setup */}
       <aside className={`w-80 shrink-0 bg-black/60 backdrop-blur-3xl border-r border-white/10 flex flex-col z-50 transition-transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 absolute md:relative h-full`}>
         <div className="p-6 border-b border-white/5 flex items-center justify-between">
-          <div>
+          <div className="flex items-center gap-3">
+            <img src="/favicon.png" alt="Logo" className="w-8 h-8 object-contain" />
             <h1 className="text-2xl font-black tracking-tighter">
               Midnite<span className="text-studio-accent">Studio</span>
             </h1>
@@ -354,21 +356,8 @@ export default function StudioPage() {
                 </div>
               )}
             </div>
-
-            {/* Recorder controls below video */}
-            {recordingState !== "recorded" && (
-              <RecorderControls
-                recordingState={recordingState}
-                isExporting={isExporting}
-                isPlaying={isPlaying}
-                onRecord={handleRecord}
-                onStop={handleStop}
-                onTogglePlay={handleTogglePlay}
-                onExport={handleExport}
-              />
-            )}
           </div>
-
+          
           {/* Right Panel — DAW Timeline */}
           <div className="flex-1 flex flex-col gap-2 min-w-0 min-h-0 overflow-hidden">
             {recordingState === "recorded" ? (() => {
@@ -487,8 +476,38 @@ export default function StudioPage() {
               </div>
             )}
           </div>
+        </div>
 
+        {/* --- CENTRAL ACTION BAR --- */}
+        <div className="shrink-0 px-6 py-3 bg-black/40 border-y border-white/5 flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            <RecorderControls
+              recordingState={recordingState}
+              isExporting={isExporting}
+              isPlaying={isPlaying}
+              canRecord={canRecord}
+              onRecord={handleRecord}
+              onStop={handleStop}
+              onTogglePlay={handleTogglePlay}
+              onExport={handleExport}
+            />
+            
+            {recordingState === "recording" && (
+              <div className="flex items-center gap-3 px-4 py-2 bg-red-500/10 rounded-xl border border-red-500/20 animate-pulse">
+                <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.8)]" />
+                <span className="text-[10px] font-black text-red-500 tracking-[0.2em] uppercase">Session Live</span>
+              </div>
+            )}
+          </div>
 
+          <div className="flex items-center gap-4 text-gray-500">
+             <div className="flex flex-col items-end">
+               <span className="text-[10px] font-bold tracking-widest uppercase text-gray-400">Project Status</span>
+               <span className="text-[9px] font-medium opacity-60">
+                 {recordingState === 'idle' ? 'Ready to capture' : recordingState === 'recording' ? 'Capturing streams...' : 'Session recorded'}
+               </span>
+             </div>
+          </div>
         </div>
 
         {/* BOTTOM MIXER - Audio Channels */}

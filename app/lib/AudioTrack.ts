@@ -15,6 +15,8 @@ export class AudioTrack {
     if (!this.audioBlob || this.audioBuffer) return this.audioBuffer;
     const arrayBuffer = await this.audioBlob.arrayBuffer();
     this.audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+    // Correct the approximate duration from stopRecording with the exact buffer duration
+    this.duration = this.audioBuffer.duration;
     return this.audioBuffer;
   }
 
@@ -147,25 +149,11 @@ export class AudioTrack {
     }
     const pitchShifter = new SoundTouchNodeClass(ctx);
     const totalPitch = this.basePitch + this.pitch;
+    const pitchRatio = Math.pow(2, totalPitch / 12);
+    pitchShifter.pitch.value = pitchRatio;
+    pitchShifter.tempo.value = 1.0;
     
-    // Add bypass gains to avoid phase destruction when pitch = 0
-    const pitchBypassGain = ctx.createGain();
-    const pitchEffectGain = ctx.createGain();
-
-    if (totalPitch === 0) {
-      pitchBypassGain.gain.value = 1;
-      pitchEffectGain.gain.value = 0;
-    } else {
-      pitchBypassGain.gain.value = 0;
-      pitchEffectGain.gain.value = 1;
-      const pitchRatio = Math.pow(2, totalPitch / 12);
-      pitchShifter.pitch.value = pitchRatio;
-      pitchShifter.tempo.value = 1.0;
-    }
-    
-    sourceNode.connect(pitchBypassGain);
     sourceNode.connect(pitchShifter);
-    pitchShifter.connect(pitchEffectGain);
 
     // 1. EQ
     const bassNode = ctx.createBiquadFilter();
@@ -181,8 +169,7 @@ export class AudioTrack {
     // 2. Bus
     const eqBus = ctx.createGain();
     
-    pitchBypassGain.connect(bassNode);
-    pitchEffectGain.connect(bassNode);
+    pitchShifter.connect(bassNode);
     bassNode.connect(trebleNode);
     trebleNode.connect(eqBus);
 
@@ -227,8 +214,6 @@ export class AudioTrack {
     if (storeNodes) {
       storeNodes({
         pitchShifter,
-        pitchBypassGain,
-        pitchEffectGain,
         bassNode,
         trebleNode,
         eqBus,
