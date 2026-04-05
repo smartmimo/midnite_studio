@@ -66,6 +66,7 @@ function audioBufferToWav(buffer: AudioBuffer): Blob {
 export class AudioManager {
   tracks: AudioTrack[] = [];
   ctx: AudioContext | null = null;
+  masterGain: GainNode | null = null;
   impulseBuffer: AudioBuffer | null = null;
   private soundTouchRegistered: boolean = false;
 
@@ -83,6 +84,11 @@ export class AudioManager {
 
     if (!this.ctx) {
       this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+
+    if (!this.masterGain) {
+      this.masterGain = this.ctx.createGain();
+      this.masterGain.connect(this.ctx.destination);
     }
 
     if (!this.soundTouchRegistered) {
@@ -154,7 +160,9 @@ export class AudioManager {
       };
 
       const finalMixer = track.setupEffectsGraph(this.ctx, sourceNode, this.impulseBuffer, storeNodes);
-      finalMixer.connect(this.ctx.destination);
+      if (this.masterGain) {
+        finalMixer.connect(this.masterGain);
+      }
     }
 
     // Start all exactly at current time
@@ -168,6 +176,17 @@ export class AudioManager {
       src.disconnect();
     });
     this.liveSources = [];
+
+    // CRITICAL: Disconnect EVERY node to kill AudioWorklet background processes
+    // and allow garbage collection of the entire audio graph.
+    this.liveNodesMap.forEach((nodes: any) => {
+      Object.values(nodes).forEach((node: any) => {
+        if (node instanceof AudioNode) {
+          try { node.disconnect(); } catch (e) { }
+        }
+      });
+    });
+
     this.liveNodesMap.clear();
   }
 

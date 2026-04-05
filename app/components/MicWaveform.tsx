@@ -75,7 +75,7 @@ export function MicWaveform({ stream, color, height = 64, sharedAudioCtx }: Prop
     }
 
     const analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 512; // Lower for performance
+    analyser.fftSize = 256; // Minimum for performance
     analyser.smoothingTimeConstant = 0.8;
     analyserRef.current = analyser;
 
@@ -130,8 +130,9 @@ export function MicWaveform({ stream, color, height = 64, sharedAudioCtx }: Prop
     return () => {
       cancelAnimationFrame(rafRef.current);
       source.disconnect();
-      analyser.disconnect();
-      // WE DO NOT CLOSE THE SHARED CONTEXT HERE
+      if (analyserRef.current) {
+        analyserRef.current.disconnect();
+      }
     };
   }, [stream, color, height, sharedAudioCtx]);
 
