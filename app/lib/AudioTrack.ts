@@ -14,7 +14,39 @@ export class AudioTrack {
   async decodeBlob(ctx: BaseAudioContext) {
     if (!this.audioBlob || this.audioBuffer) return this.audioBuffer;
     const arrayBuffer = await this.audioBlob.arrayBuffer();
-    this.audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+    let buffer = await ctx.decodeAudioData(arrayBuffer);
+
+    // Apply latency compensation (only if there is an offset provided from overdubbing)
+    if (this.latencyOffset !== 0) {
+      // 0.25s is a typical web audio/MediaRecorder round trip latency
+      const HARDWARE_LATENCY = 0.25; 
+      const cropTime = this.latencyOffset + HARDWARE_LATENCY;
+  
+      if (cropTime > 0 && cropTime < buffer.duration) {
+        const newDuration = buffer.duration - cropTime;
+        const newBuffer = ctx.createBuffer(buffer.numberOfChannels, newDuration * ctx.sampleRate, ctx.sampleRate);
+        const cropSamples = Math.floor(cropTime * ctx.sampleRate);
+        for (let i = 0; i < buffer.numberOfChannels; i++) {
+          const oldData = buffer.getChannelData(i);
+          const newData = newBuffer.getChannelData(i);
+          newData.set(oldData.subarray(cropSamples));
+        }
+        buffer = newBuffer;
+      } else if (cropTime < 0) {
+        const padTime = -cropTime;
+        const newDuration = buffer.duration + padTime;
+        const newBuffer = ctx.createBuffer(buffer.numberOfChannels, newDuration * ctx.sampleRate, ctx.sampleRate);
+        const padSamples = Math.floor(padTime * ctx.sampleRate);
+        for (let i = 0; i < buffer.numberOfChannels; i++) {
+          const oldData = buffer.getChannelData(i);
+          const newData = newBuffer.getChannelData(i);
+          newData.set(oldData, padSamples);
+        }
+        buffer = newBuffer;
+      }
+    }
+
+    this.audioBuffer = buffer;
     // Correct the approximate duration from stopRecording with the exact buffer duration
     this.duration = this.audioBuffer.duration;
     return this.audioBuffer;
@@ -66,7 +98,10 @@ export class AudioTrack {
     }
   }
 
-  startRecording() {
+  latencyOffset: number = 0; // The theoretical time diff between intended playback and actual record start
+
+  startRecording(latencyOffset: number = 0) {
+    this.latencyOffset = latencyOffset;
     if (!this.stream) throw new Error("No audio stream");
     this.chunks = [];
     this.audioBuffer = null;

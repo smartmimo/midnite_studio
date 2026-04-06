@@ -90,16 +90,34 @@ export default function StudioPage() {
     setTracks([...audioManager.tracks]);
   };
 
-  const handleRecordTrack = (id: string) => {
+  const handleRecordTrack = async (id: string) => {
 
     const track = audioManager.tracks.find(t => t.id === id);
     if (track) {
       if (videoRef.current && videoSrc) {
         videoRef.current.currentTime = 0;
       }
-      audioManager.playPreview(0).then((_) => {
-        videoRef.current?.play().then((_) => track.startRecording());
-      });
+      
+      // Ensure the exact context time by forcing pre-decodes instantly if any pending
+      await audioManager.decodeAllTracks();
+      const ctx = audioManager.context;
+
+      if (ctx) {
+        const recordStartTime = ctx.currentTime;
+        // In AudioManager, playPreview schedules at ctx.currentTime + 0.15
+        const scheduledPlayTime = ctx.currentTime + 0.15;
+        // The latency offset tells the track exactly how much "silence" it is about to incorrectly record
+        // before the backing beat actually hits the speaker.
+        track.startRecording(scheduledPlayTime - recordStartTime);
+      } else {
+        track.startRecording(0);
+      }
+
+      // 💥 Fire asynchronous audio/video play immediately AFTER recorder starts
+      audioManager.playPreview(0).catch(console.error);
+      if (videoRef.current) {
+        videoRef.current.play().catch(console.error);
+      }
 
       setIsPlaying(true);
       setOverdubbingTrackId(id);
