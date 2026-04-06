@@ -83,7 +83,11 @@ export class AudioManager {
     }
 
     if (!this.ctx) {
-      this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      this.ctx = new AudioContextClass({
+        sampleRate: 48000, // Lock internal DSP engine to 48kHz for maximum quality, avoiding Windows OS resampling artifacts
+        latencyHint: "interactive" // Ensure no audio buffer dropouts during heavy timeline playbacks
+      });
     }
 
     if (!this.masterGain) {

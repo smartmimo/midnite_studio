@@ -82,8 +82,14 @@ export class AudioTrack {
       autoGainControl: false,
       noiseSuppression: false,
       sampleRate: 48000,
-      channelCount: 2
-    };
+      channelCount: 2,
+      // Deep overrides for Chrome's hidden voice-processing heuristics to ensure raw music fidelity
+      googEchoCancellation: false,
+      googAutoGainControl: false,
+      googNoiseSuppression: false,
+      googHighpassFilter: false,
+      googTypingNoiseDetection: false,
+    } as any;
 
     const constraints: MediaStreamConstraints = {
       audio: deviceId ? { deviceId: { exact: deviceId }, ...audioConstraints } : audioConstraints,
@@ -107,8 +113,19 @@ export class AudioTrack {
     this.chunks = [];
     this.audioBuffer = null;
     try {
-      // Force high quality audio bitrate (256 kbps)
-      this.recorder = new MediaRecorder(this.stream, { audioBitsPerSecond: 256000 });
+      // Force extreme high-fidelity settings for studio music production (Max 320kbps)
+      const options: MediaRecorderOptions = { 
+         audioBitsPerSecond: 320000 
+      };
+      
+      // Explicitly request the highest fidelity Opus codec container, or fallback to Safari's AAC
+      if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+          options.mimeType = "audio/webm;codecs=opus";
+      } else if (MediaRecorder.isTypeSupported("audio/mp4;codecs=mp4a.40.2")) {
+          options.mimeType = "audio/mp4;codecs=mp4a.40.2";
+      }
+
+      this.recorder = new MediaRecorder(this.stream, options);
     } catch (e) {
       this.recorder = new MediaRecorder(this.stream);
     }
