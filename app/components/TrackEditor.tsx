@@ -92,6 +92,8 @@ export function TrackEditor({ track, canOverdub, isOverdubbing, onUpdate, onRemo
 
       {/* FX Section */}
       <div className="flex flex-col gap-4 px-6 py-5 flex-1 overflow-y-auto custom-scrollbar">
+        <SyncNudge track={track} triggerUpdate={triggerUpdate} />
+        
         <MiniSlider
           label="PITCH" value={track.pitch} min={-12} max={12} step={1}
           format={(v: number) => {
@@ -152,6 +154,51 @@ function MiniSlider({ label, value, min, max, step, onChange, format = (v: numbe
         className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-studio-accent touch-action-pan-y"
         style={{ touchAction: 'pan-y' }}
       />
+    </div>
+  );
+}
+
+// Sub-millisecond precision Nudge Editor
+function SyncNudge({ track, triggerUpdate }: any) {
+  return (
+    <div className="flex flex-col gap-2 mb-1 bg-studio-accent/5 p-3 rounded-xl border border-studio-accent/20">
+      <div className="flex justify-between items-center text-[10px] font-bold tracking-widest text-[#f43f5e] uppercase">
+        <span>Sync Time Shift</span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <button 
+          onClick={() => { track.startTimeOffset -= 0.001; triggerUpdate(); }}
+          className="w-7 h-7 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-lg text-xs font-bold text-white transition-colors"
+          title="Nudge Left 1ms"
+        >
+          -
+        </button>
+        <div className="flex-1 relative flex items-center">
+           <input 
+             type="number"
+             value={Math.round(track.startTimeOffset * 1000)}
+             onChange={(e) => {
+               const val = parseFloat(e.target.value);
+               if (!isNaN(val)) {
+                 track.startTimeOffset = val / 1000;
+                 triggerUpdate();
+               }
+             }}
+             className="w-full bg-black/50 border border-white/10 hover:border-white/20 rounded-lg py-1.5 pr-5 pl-2 text-center text-xs font-mono text-white outline-none focus:border-[#f43f5e] transition-colors"
+           />
+           <span className="absolute right-2 text-[9px] font-bold text-gray-500 pointer-events-none">ms</span>
+        </div>
+        <button 
+          onClick={() => { track.startTimeOffset += 0.001; triggerUpdate(); }}
+          className="w-7 h-7 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-lg text-xs font-bold text-white transition-colors"
+          title="Nudge Right 1ms"
+        >
+          +
+        </button>
+      </div>
+      <p className="text-[8px] text-gray-400 text-center leading-tight">
+        Type exactly or click to nudge by 1 millisecond.
+      </p>
     </div>
   );
 }
