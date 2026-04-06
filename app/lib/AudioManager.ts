@@ -248,7 +248,7 @@ export class AudioManager {
       const decoded = await track.decodeBlob(this.ctx!);
       if (decoded) {
         buffers.push({ track, buffer: decoded });
-        if (decoded.length > maxLength) maxLength = decoded.length;
+        if (decoded.duration > maxLength) maxLength = decoded.duration;
       }
     }
 

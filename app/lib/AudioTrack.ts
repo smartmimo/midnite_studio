@@ -23,9 +23,9 @@ export class AudioTrack {
       const cropTime = this.latencyOffset + HARDWARE_LATENCY;
   
       if (cropTime > 0 && cropTime < buffer.duration) {
-        const newDuration = buffer.duration - cropTime;
-        const newBuffer = ctx.createBuffer(buffer.numberOfChannels, newDuration * ctx.sampleRate, ctx.sampleRate);
         const cropSamples = Math.floor(cropTime * ctx.sampleRate);
+        const newLength = buffer.length - cropSamples;
+        const newBuffer = ctx.createBuffer(buffer.numberOfChannels, newLength, ctx.sampleRate);
         for (let i = 0; i < buffer.numberOfChannels; i++) {
           const oldData = buffer.getChannelData(i);
           const newData = newBuffer.getChannelData(i);
@@ -34,9 +34,9 @@ export class AudioTrack {
         buffer = newBuffer;
       } else if (cropTime < 0) {
         const padTime = -cropTime;
-        const newDuration = buffer.duration + padTime;
-        const newBuffer = ctx.createBuffer(buffer.numberOfChannels, newDuration * ctx.sampleRate, ctx.sampleRate);
         const padSamples = Math.floor(padTime * ctx.sampleRate);
+        const newLength = buffer.length + padSamples;
+        const newBuffer = ctx.createBuffer(buffer.numberOfChannels, newLength, ctx.sampleRate);
         for (let i = 0; i < buffer.numberOfChannels; i++) {
           const oldData = buffer.getChannelData(i);
           const newData = newBuffer.getChannelData(i);
