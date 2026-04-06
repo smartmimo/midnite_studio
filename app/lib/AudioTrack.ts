@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 export class AudioTrack {
   id: string;
   name: string = "Mic Track";
-  
+
   // Recording
   stream: MediaStream | null = null;
   recorder: MediaRecorder | null = null;
@@ -33,8 +33,6 @@ export class AudioTrack {
   isMuted: boolean = false;
   color: string = "#f43f5e";
 
-  // Track Length
-  startTime: number = 0;
   duration: number = 0;
 
   constructor(id?: string) {
@@ -72,7 +70,6 @@ export class AudioTrack {
     if (!this.stream) throw new Error("No audio stream");
     this.chunks = [];
     this.audioBuffer = null;
-    this.startTime = Date.now();
     try {
       // Force high quality audio bitrate (256 kbps)
       this.recorder = new MediaRecorder(this.stream, { audioBitsPerSecond: 256000 });
@@ -82,7 +79,7 @@ export class AudioTrack {
     this.recorder.ondataavailable = (e) => {
       if (e.data.size > 0) this.chunks.push(e.data);
     };
-    this.recorder.start(100);
+    this.recorder.start();
   }
 
   stopRecording(): Promise<Blob> {
@@ -92,7 +89,6 @@ export class AudioTrack {
         return;
       }
       this.recorder.onstop = () => {
-        this.duration = (Date.now() - this.startTime) / 1000;
         this.audioBlob = new Blob(this.chunks, { type: "audio/webm;codecs=opus" });
         this.chunks = []; // Clear RAM
         resolve(this.audioBlob);
@@ -126,7 +122,7 @@ export class AudioTrack {
     // Copy audio data
     newTrack.duration = this.duration;
     newTrack.audioBlob = this.audioBlob;
-    
+
     // Note: Live MediaStream and recorder are intentionally NOT cloned.
     return newTrack;
   }
@@ -140,7 +136,7 @@ export class AudioTrack {
     sourceNode: AudioNode,
     impulseBuffer: AudioBuffer | null,
     // Provide a way to interact with nodes dynamically if we are in live playback
-    storeNodes?: (nodes: any) => void 
+    storeNodes?: (nodes: any) => void
   ): AudioNode {
     // 0. Pitch Shift
     const SoundTouchNodeClass = (window as any).SoundTouchNodeClass;
@@ -152,7 +148,7 @@ export class AudioTrack {
     const pitchRatio = Math.pow(2, totalPitch / 12);
     pitchShifter.pitch.value = pitchRatio;
     pitchShifter.tempo.value = 1.0;
-    
+
     sourceNode.connect(pitchShifter);
 
     // 1. EQ
@@ -168,7 +164,7 @@ export class AudioTrack {
 
     // 2. Bus
     const eqBus = ctx.createGain();
-    
+
     pitchShifter.connect(bassNode);
     bassNode.connect(trebleNode);
     trebleNode.connect(eqBus);
@@ -176,7 +172,7 @@ export class AudioTrack {
     // 3. Dry Path
     const outputMixer = ctx.createGain();
     outputMixer.gain.value = this.isMuted ? 0 : this.volume;
-    
+
     const dryGain = ctx.createGain();
     dryGain.gain.value = 1;
     eqBus.connect(dryGain);

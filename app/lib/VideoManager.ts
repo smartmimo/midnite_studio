@@ -4,7 +4,6 @@ export class VideoManager {
   chunks: Blob[] = [];
   finalBlob: Blob | null = null;
 
-  startTime: number = 0;
   duration: number = 0;
 
   async requestDevice(deviceId?: string): Promise<MediaStream> {
@@ -29,8 +28,7 @@ export class VideoManager {
   startRecording() {
     if (!this.stream) throw new Error("No video stream");
     this.chunks = [];
-    this.startTime = Date.now();
-    
+
     // Choose best format
     let mimeType = 'video/webm;codecs=vp9';
     if (!MediaRecorder.isTypeSupported(mimeType)) {
@@ -44,7 +42,7 @@ export class VideoManager {
     this.recorder.ondataavailable = (e) => {
       if (e.data.size > 0) this.chunks.push(e.data);
     };
-    this.recorder.start(100); // chunk every 100ms
+    this.recorder.start();
   }
 
   stopRecording(): Promise<Blob> {
@@ -54,7 +52,6 @@ export class VideoManager {
         return;
       }
       this.recorder.onstop = () => {
-        this.duration = (Date.now() - this.startTime) / 1000;
         this.finalBlob = new Blob(this.chunks, { type: this.recorder!.mimeType });
         resolve(this.finalBlob);
       };

@@ -199,7 +199,7 @@ export class AudioManager {
       if (nodes.pitchShifter) {
         nodes.pitchShifter.pitch.value = pitchRatio;
       }
-      
+
       nodes.bassNode.gain.value = track.bass;
       nodes.trebleNode.gain.value = track.treble;
       nodes.delayNode.delayTime.value = track.delayTime;

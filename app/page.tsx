@@ -91,17 +91,19 @@ export default function StudioPage() {
   };
 
   const handleRecordTrack = (id: string) => {
-    if (videoRef.current && videoSrc) {
-      videoRef.current.currentTime = 0;
-      videoRef.current.play();
-    }
-    audioManager.playPreview(0);
-    setIsPlaying(true);
 
     const track = audioManager.tracks.find(t => t.id === id);
-    if (track) track.startRecording();
+    if (track) {
+      if (videoRef.current && videoSrc) {
+        videoRef.current.currentTime = 0;
+      }
+      audioManager.playPreview(0).then((_) => {
+        videoRef.current?.play().then((_) => track.startRecording());
+      });
 
-    setOverdubbingTrackId(id);
+      setIsPlaying(true);
+      setOverdubbingTrackId(id);
+    }
   };
 
   const handleStopRecordTrack = async (id: string) => {
@@ -512,7 +514,7 @@ export default function StudioPage() {
               <h2 className="text-[10px] font-black tracking-[0.2em] text-gray-400 uppercase">Input Audio Console</h2>
               <span className="text-[10px] text-gray-600 font-bold tracking-widest hidden md:inline">{tracks.length} ACTIVE CHANNELS</span>
             </div>
-            
+
             <button className="flex items-center gap-1.5 px-3 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[10px] font-bold text-gray-300 transition-all">
               {isMixerCollapsed ? (
                 <>Expand <span className="text-studio-accent">Mixer</span></>
@@ -524,27 +526,27 @@ export default function StudioPage() {
 
           {!isMixerCollapsed && (
             <div className="flex-1 flex items-stretch gap-4 p-6 overflow-x-auto overflow-y-hidden custom-scrollbar animate-in fade-in slide-in-from-bottom-2 duration-300">
-            {tracks.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center border-2 border-dashed border-white/10 rounded-2xl text-gray-500/50 font-bold uppercase tracking-widest text-lg">
-                Add a channel to begin mixing
-              </div>
-            ) : (
-              tracks.map(track => (
-                <TrackEditor
-                  key={track.id}
-                  track={track}
-                  canOverdub={recordingState === "recorded"}
-                  isOverdubbing={overdubbingTrackId === track.id}
-                  onUpdate={handleTrackUpdate}
-                  onRemove={handleRemoveTrack}
-                  onRecordTrack={handleRecordTrack}
-                  onStopRecordTrack={handleStopRecordTrack}
-                  onDuplicateTrack={handleDuplicateTrack}
-                  sharedAudioCtx={audioManager.context}
-                />
-              ))
-            )}
-          </div>
+              {tracks.length === 0 ? (
+                <div className="flex-1 flex items-center justify-center border-2 border-dashed border-white/10 rounded-2xl text-gray-500/50 font-bold uppercase tracking-widest text-lg">
+                  Add a channel to begin mixing
+                </div>
+              ) : (
+                tracks.map(track => (
+                  <TrackEditor
+                    key={track.id}
+                    track={track}
+                    canOverdub={recordingState === "recorded"}
+                    isOverdubbing={overdubbingTrackId === track.id}
+                    onUpdate={handleTrackUpdate}
+                    onRemove={handleRemoveTrack}
+                    onRecordTrack={handleRecordTrack}
+                    onStopRecordTrack={handleStopRecordTrack}
+                    onDuplicateTrack={handleDuplicateTrack}
+                    sharedAudioCtx={audioManager.context}
+                  />
+                ))
+              )}
+            </div>
           )}
         </div>
 
