@@ -165,9 +165,33 @@ export class AudioManager {
       }
     }
 
-    // Start all exactly at current time
+    // Start all exactly at current time or scaled
     const when = (this.ctx?.currentTime || 0) + 0.15;
-    this.liveSources.forEach(src => src.start(when, offset));
+    
+    for (const track of this.tracks) {
+      if (!track.audioBuffer) continue;
+      
+      const sourceNode = this.liveSources.find(s => s.buffer === track.audioBuffer);
+      if (!sourceNode) continue;
+      
+      const trackRelativeTime = offset - track.startTimeOffset;
+      let startWhen = when;
+      let bufferOffset = 0;
+
+      if (trackRelativeTime < 0) {
+          // Track plays in the future
+          startWhen += Math.abs(trackRelativeTime);
+          bufferOffset = 0;
+      } else {
+          // Playhead already past the start of the track, start immediately
+          startWhen = when;
+          bufferOffset = trackRelativeTime;
+      }
+      
+      if (bufferOffset < track.audioBuffer.duration) {
+          sourceNode.start(startWhen, bufferOffset);
+      }
+    }
   }
 
   stopPreview() {
@@ -230,9 +254,16 @@ export class AudioManager {
 
     if (buffers.length === 0) throw new Error("No recorded audio to export");
 
+    for (const item of buffers) {
+      const end = item.track.startTimeOffset + item.track.duration;
+      if (end > maxLength) maxLength = end;
+    }
+    // ensure at least min time
+    if (maxLength < 1) maxLength = 1;
+
     // Render with OfflineAudioContext
     const sampleRate = this.ctx!.sampleRate;
-    const offlineCtx = new OfflineAudioContext(2, maxLength, sampleRate);
+    const offlineCtx = new OfflineAudioContext(2, Math.ceil(maxLength * sampleRate), sampleRate);
     const mod = await import("@soundtouchjs/audio-worklet");
     await mod.SoundTouchNode.register(offlineCtx, '/soundtouch-processor.js');
     const offlineImpulse = createSyntheticImpulseResponse(offlineCtx);
@@ -242,7 +273,12 @@ export class AudioManager {
       sourceNode.buffer = item.buffer;
       const finalMixer = item.track.setupEffectsGraph(offlineCtx, sourceNode, offlineImpulse);
       finalMixer.connect(offlineCtx.destination);
-      sourceNode.start(0);
+      
+      const startWhen = Math.max(0, item.track.startTimeOffset);
+      const startOffset = Math.max(0, -item.track.startTimeOffset);
+      if (startOffset < item.buffer.length / sampleRate) {
+        sourceNode.start(startWhen, startOffset);
+      }
     }
 
     const renderedBuffer = await offlineCtx.startRendering();

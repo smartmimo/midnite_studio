@@ -66,6 +66,7 @@ export class AudioTrack {
   color: string = "#f43f5e";
 
   duration: number = 0;
+  startTimeOffset: number = 0; // Visual/Timeline placement offset
 
   constructor(id?: string) {
     this.id = id || uuidv4();
@@ -153,6 +154,7 @@ export class AudioTrack {
     newTrack.volume = this.volume;
     newTrack.isMuted = this.isMuted;
     newTrack.color = this.color;
+    newTrack.startTimeOffset = this.startTimeOffset;
 
     // Copy audio data
     newTrack.duration = this.duration;

@@ -20,11 +20,26 @@ interface Props {
   widthPercent?: number;
   isMuted?: boolean;
   preDecodedBuffer?: AudioBuffer | null;
+  startTimeOffset?: number;
+  maxDuration?: number;
+  onOffsetChange?: (newOffset: number) => void;
 }
 
-export function RecordedWaveformTrack({ name, blob, color, duration, widthPercent = 100, isMuted = false, preDecodedBuffer }: Props) {
+export function RecordedWaveformTrack({ name, blob, color, duration, widthPercent = 100, isMuted = false, preDecodedBuffer, startTimeOffset = 0, maxDuration = 1, onOffsetChange }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [decoded, setDecoded] = useState(false);
+
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [initialOffset, setInitialOffset] = useState(0);
+  const [localOffset, setLocalOffset] = useState(startTimeOffset);
+
+  // Sync prop changes
+  useEffect(() => {
+    if (!isDragging) {
+      setLocalOffset(startTimeOffset);
+    }
+  }, [startTimeOffset, isDragging]);
 
   useEffect(() => {
     if (!blob || blob.size === 0) return;
@@ -88,11 +103,41 @@ export function RecordedWaveformTrack({ name, blob, color, duration, widthPercen
     ? `${Math.floor(duration / 60)}:${String(Math.floor(duration % 60)).padStart(2, "0")}`
     : null;
 
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    setIsDragging(true);
+    setStartX(e.clientX);
+    setInitialOffset(localOffset);
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+    e.stopPropagation();
+    const deltaX = e.clientX - startX;
+    const parentWidth = e.currentTarget.parentElement?.offsetWidth || 1;
+    const timeDelta = (deltaX / parentWidth) * maxDuration;
+    setLocalOffset(initialOffset + timeDelta);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+    e.stopPropagation();
+    setIsDragging(false);
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    if (onOffsetChange) onOffsetChange(localOffset);
+  };
+
   return (
     <div
-      className="flex flex-col rounded-xl overflow-hidden shrink-0 border transition-all duration-300"
+      className={`flex flex-col rounded-xl overflow-hidden shrink-0 border transition-all duration-300 ${isDragging ? "cursor-grabbing shadow-2xl z-50 scale-[1.01]" : "cursor-grab"}`}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
       style={{
         width: `${widthPercent}%`,
+        marginLeft: `${(localOffset / maxDuration) * 100}%`,
         borderColor: hexToRgba(color, isMuted ? 0.1 : 0.25),
         background: hexToRgba(color, isMuted ? 0.02 : 0.04),
         opacity: isMuted ? 0.35 : 1,

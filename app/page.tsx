@@ -282,7 +282,7 @@ export default function StudioPage() {
   useEffect(() => {
     const recTracks = tracks.filter(t => t.audioBlob && t.duration > 0);
     maxDurationRef.current = recTracks.length > 0
-      ? Math.max(...recTracks.map(t => t.duration))
+      ? Math.max(...recTracks.map(t => Math.max(t.duration, t.duration + t.startTimeOffset)))
       : Math.max(videoDuration || 1, 1);
   }, [tracks, videoDuration]);
 
@@ -384,7 +384,7 @@ export default function StudioPage() {
             {recordingState === "recorded" ? (() => {
               const recordedTracks = tracks.filter(t => t.audioBlob && t.duration > 0);
               const maxDuration = recordedTracks.length > 0
-                ? Math.max(...recordedTracks.map(t => t.duration))
+                ? Math.max(...recordedTracks.map(t => Math.max(t.duration, t.duration + t.startTimeOffset)))
                 : (videoDuration || 1);
               const handleTimelineSeek = (e: React.MouseEvent<HTMLDivElement>) => {
                 const rect = e.currentTarget.getBoundingClientRect();
@@ -430,6 +430,12 @@ export default function StudioPage() {
                             widthPercent={maxDuration > 0 ? (track.duration / maxDuration) * 100 : 100}
                             isMuted={track.isMuted}
                             preDecodedBuffer={track.audioBuffer}
+                            startTimeOffset={track.startTimeOffset}
+                            maxDuration={maxDuration}
+                            onOffsetChange={(newOffset) => {
+                              track.startTimeOffset = newOffset;
+                              handleTrackUpdate(track);
+                            }}
                           />
                         ))
                       )}
