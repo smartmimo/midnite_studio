@@ -64,6 +64,7 @@ export class AudioTrack {
   volume: number = 1;     // 0 to 2
   isMuted: boolean = false;
   color: string = "#f43f5e";
+  noiseGateThreshold: number = -100; // -100 to 0 (dB)
 
   duration: number = 0;
   startTimeOffset: number = 0; // Visual/Timeline placement offset
@@ -171,6 +172,7 @@ export class AudioTrack {
     newTrack.volume = this.volume;
     newTrack.isMuted = this.isMuted;
     newTrack.color = this.color;
+    newTrack.noiseGateThreshold = this.noiseGateThreshold;
     newTrack.startTimeOffset = this.startTimeOffset;
 
     // Copy audio data
@@ -192,7 +194,14 @@ export class AudioTrack {
     // Provide a way to interact with nodes dynamically if we are in live playback
     storeNodes?: (nodes: any) => void
   ): AudioNode {
-    // 0. Pitch Shift
+    // 0. Noise Gate (apply before pitch & eq to preserve reverb tails and quality)
+    const noiseGateNode = new AudioWorkletNode(ctx, 'noise-gate-processor');
+    const thresholdParam = (noiseGateNode.parameters as Map<string, AudioParam>).get('threshold');
+    if (thresholdParam) thresholdParam.value = this.noiseGateThreshold;
+    
+    sourceNode.connect(noiseGateNode);
+
+    // 1. Pitch Shift
     const SoundTouchNodeClass = (window as any).SoundTouchNodeClass;
     if (!SoundTouchNodeClass) {
       throw new Error("SoundTouchNodeClass not injected");
@@ -203,7 +212,7 @@ export class AudioTrack {
     pitchShifter.pitch.value = pitchRatio;
     pitchShifter.tempo.value = 1.0;
 
-    sourceNode.connect(pitchShifter);
+    noiseGateNode.connect(pitchShifter);
 
     // 1. EQ
     const bassNode = ctx.createBiquadFilter();
@@ -263,6 +272,7 @@ export class AudioTrack {
 
     if (storeNodes) {
       storeNodes({
+        noiseGateNode,
         pitchShifter,
         bassNode,
         trebleNode,

@@ -1,5 +1,5 @@
 import { AudioTrack } from "./AudioTrack";
-
+import { noiseGateWorkletCode } from "./noiseGateWorklet";
 // Generate a simple synthetic impulse response for the Reverb effect
 function createSyntheticImpulseResponse(ctx: BaseAudioContext): AudioBuffer {
   const sampleRate = ctx.sampleRate;
@@ -100,6 +100,10 @@ export class AudioManager {
       const mod = await import("@soundtouchjs/audio-worklet");
       (window as any).SoundTouchNodeClass = mod.SoundTouchNode;
       await mod.SoundTouchNode.register(this.ctx, '/soundtouch-processor.js');
+      
+      const gateBlob = new Blob([noiseGateWorkletCode], { type: 'application/javascript' });
+      await this.ctx.audioWorklet.addModule(URL.createObjectURL(gateBlob));
+
       this.soundTouchRegistered = true;
     }
 
@@ -222,6 +226,11 @@ export class AudioManager {
   updateLiveNodes(track: AudioTrack) {
     const nodes = this.liveNodesMap.get(track.id);
     if (nodes) {
+      if (nodes.noiseGateNode) {
+        const thresholdParam = nodes.noiseGateNode.parameters.get('threshold');
+        if (thresholdParam) thresholdParam.value = track.noiseGateThreshold;
+      }
+      
       const totalPitch = track.basePitch + track.pitch;
       const pitchRatio = Math.pow(2, totalPitch / 12);
       if (nodes.pitchShifter) {
@@ -270,6 +279,10 @@ export class AudioManager {
     const offlineCtx = new OfflineAudioContext(2, Math.ceil(maxLength * sampleRate), sampleRate);
     const mod = await import("@soundtouchjs/audio-worklet");
     await mod.SoundTouchNode.register(offlineCtx, '/soundtouch-processor.js');
+    
+    const gateBlob = new Blob([noiseGateWorkletCode], { type: 'application/javascript' });
+    await offlineCtx.audioWorklet.addModule(URL.createObjectURL(gateBlob));
+
     const offlineImpulse = createSyntheticImpulseResponse(offlineCtx);
 
     for (const item of buffers) {

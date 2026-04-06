@@ -116,6 +116,11 @@ export function TrackEditor({ track, canOverdub, isOverdubbing, onUpdate, onRemo
           format={(v: number) => `${Math.round(v * 100)}%`}
           onChange={(v: number) => { track.volume = v; triggerUpdate(); }}
         />
+        <MiniSlider
+          label="NOISE GATE" value={track.noiseGateThreshold} min={-100} max={0} step={1}
+          format={(v: number) => v <= -99 ? "OFF" : `${Math.round(v)}dB`}
+          onChange={(v: number) => { track.noiseGateThreshold = v; triggerUpdate(); }}
+        />
         <hr className="border-white/5 my-1" />
         <MiniSlider label="BASS" value={track.bass} min={-20} max={20} step={1} onChange={(v: number) => { track.bass = v; triggerUpdate(); }} />
         <MiniSlider label="TREBLE" value={track.treble} min={-20} max={20} step={1} onChange={(v: number) => { track.treble = v; triggerUpdate(); }} />

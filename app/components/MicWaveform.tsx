@@ -29,6 +29,7 @@ function getSharedCtx() {
 
 export function MicWaveform({ stream, color, height = 64, sharedAudioCtx }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const dbDisplayRef = useRef<HTMLSpanElement>(null);
   const rafRef = useRef<number>(0);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -61,6 +62,10 @@ export function MicWaveform({ stream, color, height = 64, sharedAudioCtx }: Prop
         ctx2d.strokeStyle = hexToRgba(color, 0.25);
         ctx2d.lineWidth = 1.5;
         ctx2d.stroke();
+
+        if (dbDisplayRef.current) {
+          dbDisplayRef.current.textContent = "-100 dB";
+        }
       };
       draw();
       return;
@@ -85,6 +90,7 @@ export function MicWaveform({ stream, color, height = 64, sharedAudioCtx }: Prop
 
     const bufferLength = analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
+    const floatArray = new Float32Array(bufferLength);
 
     const waveColor = hexToRgba(color, 1.0);
     const bgColor = "#0c0c0c";
@@ -100,6 +106,19 @@ export function MicWaveform({ stream, color, height = 64, sharedAudioCtx }: Prop
       }
 
       analyser.getByteTimeDomainData(dataArray);
+      analyser.getFloatTimeDomainData(floatArray);
+
+      let sum = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        sum += floatArray[i] * floatArray[i];
+      }
+      const rms = Math.sqrt(sum / bufferLength);
+      let db = 20 * Math.log10(rms);
+      if (!isFinite(db) || db < -100) db = -100;
+
+      if (dbDisplayRef.current) {
+        dbDisplayRef.current.textContent = `${Math.round(db)} dB`;
+      }
 
       ctx2d.fillStyle = bgColor;
       ctx2d.fillRect(0, 0, canvas.width, canvas.height);
@@ -137,10 +156,15 @@ export function MicWaveform({ stream, color, height = 64, sharedAudioCtx }: Prop
   }, [stream, color, height, sharedAudioCtx]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      style={{ width: "100%", height: `${height}px`, display: "block" }}
-      className="rounded-t-2xl"
-    />
+    <div className="flex items-center justify-between gap-2">
+      <canvas
+        ref={canvasRef}
+        style={{ width: "100%", height: `${height}px`, display: "block" }}
+        className="rounded-t-2xl flex-1"
+      />
+      <span ref={dbDisplayRef} className="text-[10px] font-mono text-gray-500 w-11 text-right tracking-tighter">
+        -100 dB
+      </span>
+    </div>
   );
 }
