@@ -108,7 +108,7 @@ export class AudioTrack {
       autoGainControl: false,
       noiseSuppression: false,
       sampleRate: 48000,
-      channelCount: 2,
+      channelCount: 1,
       // Deep overrides for Chrome's hidden voice-processing heuristics to ensure raw music fidelity
       googEchoCancellation: false,
       googAutoGainControl: false,
