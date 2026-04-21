@@ -53,20 +53,21 @@ export class AudioTrack {
       const left = buffer.getChannelData(0);
       const right = buffer.getChannelData(1);
 
-      let leftHasAudio = false;
-      let rightHasAudio = false;
+      let leftPeak = 0;
+      let rightPeak = 0;
 
-      // Sample a subset for performance (check every 100th sample)
+      // Sample a subset for performance to find the peak amplitude
       for (let i = 0; i < buffer.length; i += 100) {
-        if (!leftHasAudio && Math.abs(left[i]) > 0.0001) leftHasAudio = true;
-        if (!rightHasAudio && Math.abs(right[i]) > 0.0001) rightHasAudio = true;
-        if (leftHasAudio && rightHasAudio) break;
+        const lAbs = Math.abs(left[i]);
+        const rAbs = Math.abs(right[i]);
+        if (lAbs > leftPeak) leftPeak = lAbs;
+        if (rAbs > rightPeak) rightPeak = rAbs;
       }
 
-      // If one channel is active and the other is silent, duplicate the active channel
-      if (leftHasAudio && !rightHasAudio) {
+      // If one channel has significant audio and the other is just hardware noise floor (< 0.01 / -40dB)
+      if (leftPeak > 0.01 && rightPeak < 0.01) {
         for (let i = 0; i < buffer.length; i++) right[i] = left[i];
-      } else if (!leftHasAudio && rightHasAudio) {
+      } else if (rightPeak > 0.01 && leftPeak < 0.01) {
         for (let i = 0; i < buffer.length; i++) left[i] = right[i];
       }
     }
@@ -108,7 +109,7 @@ export class AudioTrack {
       autoGainControl: false,
       noiseSuppression: false,
       sampleRate: 48000,
-      channelCount: 1,
+      channelCount: 2,
       // Deep overrides for Chrome's hidden voice-processing heuristics to ensure raw music fidelity
       googEchoCancellation: false,
       googAutoGainControl: false,
