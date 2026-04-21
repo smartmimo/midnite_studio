@@ -47,6 +47,7 @@ export class ExportEngine {
       "-map", "0:v:0",
       "-map", "1:a:0",
       "-c:a", "aac",
+      "-b:a", "320k",
       "output.mp4"
     ]);
 

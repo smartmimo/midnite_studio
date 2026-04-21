@@ -8,9 +8,14 @@ function createSyntheticImpulseResponse(ctx: BaseAudioContext): AudioBuffer {
 
   for (let channel = 0; channel < 2; channel++) {
     const channelData = buffer.getChannelData(channel);
+    let lastOut = 0; // State for simple 1-pole lowpass filter
     for (let i = 0; i < length; i++) {
       const noise = (Math.random() * 2 - 1);
-      channelData[i] = noise * Math.exp(-i / (sampleRate * 0.3));
+      // Low pass filter the noise to emulate natural high-frequency damping of acoustics
+      const filtered = (lastOut + noise) * 0.5;
+      lastOut = filtered;
+      
+      channelData[i] = filtered * Math.exp(-i / (sampleRate * 0.3));
     }
   }
   return buffer;
@@ -235,6 +240,10 @@ export class AudioManager {
       const pitchRatio = Math.pow(2, totalPitch / 12);
       if (nodes.pitchShifter) {
         nodes.pitchShifter.pitch.value = pitchRatio;
+      }
+      if (nodes.pitchBypassGain && nodes.pitchActiveGain) {
+         nodes.pitchBypassGain.gain.value = totalPitch === 0 ? 1 : 0;
+         nodes.pitchActiveGain.gain.value = totalPitch === 0 ? 0 : 1;
       }
 
       nodes.bassNode.gain.value = track.bass;

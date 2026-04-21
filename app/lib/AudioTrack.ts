@@ -19,9 +19,9 @@ export class AudioTrack {
     // Apply latency compensation (only if there is an offset provided from overdubbing)
     if (this.latencyOffset !== 0) {
       // 0.25s is a typical web audio/MediaRecorder round trip latency
-      const HARDWARE_LATENCY = 0.25; 
+      const HARDWARE_LATENCY = 0.25;
       const cropTime = this.latencyOffset + HARDWARE_LATENCY;
-  
+
       if (cropTime > 0 && cropTime < buffer.duration) {
         const cropSamples = Math.floor(cropTime * ctx.sampleRate);
         const newLength = buffer.length - cropSamples;
@@ -45,7 +45,6 @@ export class AudioTrack {
         buffer = newBuffer;
       }
     }
-
     this.audioBuffer = buffer;
     // Correct the approximate duration from stopRecording with the exact buffer duration
     this.duration = this.audioBuffer.duration;
@@ -83,7 +82,7 @@ export class AudioTrack {
       autoGainControl: false,
       noiseSuppression: false,
       sampleRate: 48000,
-      channelCount: 2,
+      channelCount: 1, // Let the browser properly downmix the hardware audio interface to mono
       // Deep overrides for Chrome's hidden voice-processing heuristics to ensure raw music fidelity
       googEchoCancellation: false,
       googAutoGainControl: false,
@@ -115,15 +114,15 @@ export class AudioTrack {
     this.audioBuffer = null;
     try {
       // Force extreme high-fidelity settings for studio music production (Max 320kbps)
-      const options: MediaRecorderOptions = { 
-         audioBitsPerSecond: 320000 
+      const options: MediaRecorderOptions = {
+        audioBitsPerSecond: 320000
       };
-      
+
       // Explicitly request the highest fidelity Opus codec container, or fallback to Safari's AAC
       if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
-          options.mimeType = "audio/webm;codecs=opus";
+        options.mimeType = "audio/webm;codecs=opus";
       } else if (MediaRecorder.isTypeSupported("audio/mp4;codecs=mp4a.40.2")) {
-          options.mimeType = "audio/mp4;codecs=mp4a.40.2";
+        options.mimeType = "audio/mp4;codecs=mp4a.40.2";
       }
 
       this.recorder = new MediaRecorder(this.stream, options);
@@ -198,10 +197,13 @@ export class AudioTrack {
     const noiseGateNode = new AudioWorkletNode(ctx, 'noise-gate-processor');
     const thresholdParam = (noiseGateNode.parameters as Map<string, AudioParam>).get('threshold');
     if (thresholdParam) thresholdParam.value = this.noiseGateThreshold;
-    
+
     sourceNode.connect(noiseGateNode);
 
-    // 1. Pitch Shift
+    // 1. Pitch Shift (Bypassed when pitch is 0 to avoid severe granular synthesis audio artifacts)
+    const pitchBypassGain = ctx.createGain();
+    const pitchActiveGain = ctx.createGain();
+
     const SoundTouchNodeClass = (window as any).SoundTouchNodeClass;
     if (!SoundTouchNodeClass) {
       throw new Error("SoundTouchNodeClass not injected");
@@ -212,7 +214,14 @@ export class AudioTrack {
     pitchShifter.pitch.value = pitchRatio;
     pitchShifter.tempo.value = 1.0;
 
+    // Route signal into bypass and active pathways
+    noiseGateNode.connect(pitchBypassGain);
     noiseGateNode.connect(pitchShifter);
+    pitchShifter.connect(pitchActiveGain);
+
+    // Initial state
+    pitchBypassGain.gain.value = totalPitch === 0 ? 1 : 0;
+    pitchActiveGain.gain.value = totalPitch === 0 ? 0 : 1;
 
     // 1. EQ
     const bassNode = ctx.createBiquadFilter();
@@ -228,7 +237,8 @@ export class AudioTrack {
     // 2. Bus
     const eqBus = ctx.createGain();
 
-    pitchShifter.connect(bassNode);
+    pitchBypassGain.connect(bassNode);
+    pitchActiveGain.connect(bassNode);
     bassNode.connect(trebleNode);
     trebleNode.connect(eqBus);
 
@@ -274,6 +284,8 @@ export class AudioTrack {
       storeNodes({
         noiseGateNode,
         pitchShifter,
+        pitchBypassGain,
+        pitchActiveGain,
         bassNode,
         trebleNode,
         eqBus,

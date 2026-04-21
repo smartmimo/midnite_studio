@@ -28,38 +28,35 @@ class NoiseGateProcessor extends AudioWorkletProcessor {
 
     const threshold = Math.pow(10, thresholdDB / 20);
 
-    // Fast attack (to not cut transients) and slower release (to not click)
     const attackCoef = 0.05; 
     const releaseCoef = 0.002; 
     const gainAttack = 0.1; 
     const gainRelease = 0.005;
 
-    for (let c = 0; c < input.length; c++) {
-      const inChannel = input[c];
-      const outChannel = output[c];
-
-      for (let i = 0; i < inChannel.length; i++) {
-        // Track envelope strictly on the left channel (0) to avoid stereo phase wandering
-        if (c === 0) {
-           const absIn = Math.abs(inChannel[i]);
-           if (absIn > this.envelope) {
-               this.envelope += attackCoef * (absIn - this.envelope);
-           } else {
-               this.envelope += releaseCoef * (absIn - this.envelope);
-           }
-           
-           const targetGain = this.envelope > threshold ? 1 : 0;
-           
-           if (targetGain > this.gain) {
-               this.gain += gainAttack * (targetGain - this.gain);
-           } else {
-               this.gain += gainRelease * (targetGain - this.gain);
-           }
-        }
-        
-        outChannel[i] = inChannel[i] * this.gain;
+    const sampleCount = input[0].length;
+    for (let i = 0; i < sampleCount; i++) {
+      // Track envelope based on the first channel
+      const absIn = Math.abs(input[0][i]);
+      if (absIn > this.envelope) {
+          this.envelope += attackCoef * (absIn - this.envelope);
+      } else {
+          this.envelope += releaseCoef * (absIn - this.envelope);
+      }
+      
+      const targetGain = this.envelope > threshold ? 1 : 0;
+      
+      if (targetGain > this.gain) {
+          this.gain += gainAttack * (targetGain - this.gain);
+      } else {
+          this.gain += gainRelease * (targetGain - this.gain);
+      }
+      
+      // Apply exact smooth gain to all channels for this sample
+      for (let c = 0; c < input.length; c++) {
+        output[c][i] = input[c][i] * this.gain;
       }
     }
+    
     return true;
   }
 }
