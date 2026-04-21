@@ -45,6 +45,32 @@ export class AudioTrack {
         buffer = newBuffer;
       }
     }
+
+    // Detect and fix mono inputs from 2-channel audio interfaces (where 1 channel is completely silent)
+    // This is required because we explicitly disable WebRTC's echoCancellation and noiseSuppression to preserve studio
+    // music fidelity, which forces Chrome to bypass its native OS downmixer and pipe the raw hardware streams directly.
+    if (buffer.numberOfChannels === 2) {
+      const left = buffer.getChannelData(0);
+      const right = buffer.getChannelData(1);
+
+      let leftHasAudio = false;
+      let rightHasAudio = false;
+
+      // Sample a subset for performance (check every 100th sample)
+      for (let i = 0; i < buffer.length; i += 100) {
+        if (!leftHasAudio && Math.abs(left[i]) > 0.0001) leftHasAudio = true;
+        if (!rightHasAudio && Math.abs(right[i]) > 0.0001) rightHasAudio = true;
+        if (leftHasAudio && rightHasAudio) break;
+      }
+
+      // If one channel is active and the other is silent, duplicate the active channel
+      if (leftHasAudio && !rightHasAudio) {
+        for (let i = 0; i < buffer.length; i++) right[i] = left[i];
+      } else if (!leftHasAudio && rightHasAudio) {
+        for (let i = 0; i < buffer.length; i++) left[i] = right[i];
+      }
+    }
+
     this.audioBuffer = buffer;
     // Correct the approximate duration from stopRecording with the exact buffer duration
     this.duration = this.audioBuffer.duration;
@@ -82,7 +108,7 @@ export class AudioTrack {
       autoGainControl: false,
       noiseSuppression: false,
       sampleRate: 48000,
-      channelCount: 1, // Let the browser properly downmix the hardware audio interface to mono
+      channelCount: 2,
       // Deep overrides for Chrome's hidden voice-processing heuristics to ensure raw music fidelity
       googEchoCancellation: false,
       googAutoGainControl: false,
@@ -193,12 +219,18 @@ export class AudioTrack {
     // Provide a way to interact with nodes dynamically if we are in live playback
     storeNodes?: (nodes: any) => void
   ): AudioNode {
+    // -1. DC Offset & Rumble filter (Remove subsonic noise before it triggers gates or effects)
+    const rumbleFilter = ctx.createBiquadFilter();
+    rumbleFilter.type = "highpass";
+    rumbleFilter.frequency.value = 30; // 30Hz cutoff
+    sourceNode.connect(rumbleFilter);
+
     // 0. Noise Gate (apply before pitch & eq to preserve reverb tails and quality)
     const noiseGateNode = new AudioWorkletNode(ctx, 'noise-gate-processor');
     const thresholdParam = (noiseGateNode.parameters as Map<string, AudioParam>).get('threshold');
     if (thresholdParam) thresholdParam.value = this.noiseGateThreshold;
 
-    sourceNode.connect(noiseGateNode);
+    rumbleFilter.connect(noiseGateNode);
 
     // 1. Pitch Shift (Bypassed when pitch is 0 to avoid severe granular synthesis audio artifacts)
     const pitchBypassGain = ctx.createGain();
@@ -251,19 +283,25 @@ export class AudioTrack {
     eqBus.connect(dryGain);
     dryGain.connect(outputMixer);
 
-    // 4. Echo (Delay)
+    // 4. Echo (Delay) with Tape Dampening
     const delayNode = ctx.createDelay(2.0); // max delay 2s
     delayNode.delayTime.value = this.delayTime;
 
     const feedbackGain = ctx.createGain();
     feedbackGain.gain.value = this.feedback;
 
+    // Tape Echo Dampening Filter (Rolls off harsh treble with each repeat)
+    const tapeDampener = ctx.createBiquadFilter();
+    tapeDampener.type = "lowpass";
+    tapeDampener.frequency.value = 3000;
+
     const echoMixGain = ctx.createGain();
     echoMixGain.gain.value = this.echoMix;
 
     eqBus.connect(delayNode);
     delayNode.connect(feedbackGain);
-    feedbackGain.connect(delayNode); // feedback loop
+    feedbackGain.connect(tapeDampener);
+    tapeDampener.connect(delayNode); // feedback loop with dampening
     delayNode.connect(echoMixGain);
     echoMixGain.connect(outputMixer);
 

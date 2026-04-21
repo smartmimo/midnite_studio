@@ -97,7 +97,17 @@ export class AudioManager {
 
     if (!this.masterGain) {
       this.masterGain = this.ctx.createGain();
-      this.masterGain.connect(this.ctx.destination);
+      
+      // Studio Brickwall Limiter: prevents digital clipping distortion when stacking multiple tracks
+      const masterLimiter = this.ctx.createDynamicsCompressor();
+      masterLimiter.threshold.value = -1.0;  // Engage just before 0dBFS
+      masterLimiter.knee.value = 0.0;        // Hard knee for precise boundary
+      masterLimiter.ratio.value = 20.0;      // Infinite/Brickwall ratio
+      masterLimiter.attack.value = 0.002;    // Fast attack to catch peaks (~2ms)
+      masterLimiter.release.value = 0.1;     // Moderate release (~100ms) to preserve loudness
+
+      this.masterGain.connect(masterLimiter);
+      masterLimiter.connect(this.ctx.destination);
     }
 
     if (!this.soundTouchRegistered) {
@@ -294,11 +304,20 @@ export class AudioManager {
 
     const offlineImpulse = createSyntheticImpulseResponse(offlineCtx);
 
+    // Studio Brickwall Limiter for offline rendering mixdown
+    const offlineLimiter = offlineCtx.createDynamicsCompressor();
+    offlineLimiter.threshold.value = -1.0;
+    offlineLimiter.knee.value = 0.0;
+    offlineLimiter.ratio.value = 20.0;
+    offlineLimiter.attack.value = 0.002;
+    offlineLimiter.release.value = 0.1;
+    offlineLimiter.connect(offlineCtx.destination);
+
     for (const item of buffers) {
       const sourceNode = offlineCtx.createBufferSource();
       sourceNode.buffer = item.buffer;
       const finalMixer = item.track.setupEffectsGraph(offlineCtx, sourceNode, offlineImpulse);
-      finalMixer.connect(offlineCtx.destination);
+      finalMixer.connect(offlineLimiter);
       
       const startWhen = Math.max(0, item.track.startTimeOffset);
       const startOffset = Math.max(0, -item.track.startTimeOffset);

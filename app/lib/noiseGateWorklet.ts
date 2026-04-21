@@ -28,10 +28,11 @@ class NoiseGateProcessor extends AudioWorkletProcessor {
 
     const threshold = Math.pow(10, thresholdDB / 20);
 
-    const attackCoef = 0.05; 
-    const releaseCoef = 0.002; 
-    const gainAttack = 0.1; 
-    const gainRelease = 0.005;
+    // Music-friendly attack (~2ms) and release (~200ms) coefficients
+    const attackCoef = 0.01; 
+    const releaseCoef = 0.0001; 
+    const gainAttack = 0.05; 
+    const gainRelease = 0.0005;
 
     const sampleCount = input[0].length;
     for (let i = 0; i < sampleCount; i++) {
